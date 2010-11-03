@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby -w
+
+begin
+  require 'rubygems'
+rescue LoadError
+end
+require 'yaml'
+require 'optparse'
+
+opts = OptionParser.new
+opts.banner = <<BANNER
+Usage: #{opts.program_name} PATH_TO_CONFIG
+
+Start a tkellem instance using the specified configuration file (or ~/.tkellem/config.yml if none given)
+BANNER
+
+opts.on_tail("-h", "--help") { puts opts; exit }
+
+rest = opts.parse(ARGV)
+config_filename = rest.first or File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
+
+configs = YAML.load_file(config_filename)
+
+$LOAD_PATH.push(File.expand_path(File.dirname(__FILE__)+'/../lib'))
+require 'tkellem'
+
+EM.run do
+  configs.each do |config|
+    EM.connect(config['host'], config['port'], Listener, config)
+  end
+end

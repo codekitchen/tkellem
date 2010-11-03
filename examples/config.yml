@@ -1,0 +1,15 @@
+--- 
+- name: freenode
+  ssl: false
+  nick: tkellem_r0ck
+  port: 6667
+  rooms: 
+  - name: "#tkellem_test"
+  host: irc.freenode.org
+  clients: 
+  - name: laptop
+    ssl: true
+    port: 10001
+  - name: iphone
+    ssl: true
+    port: 10002
