@@ -1,5 +1,5 @@
 class IrcLine
-  RE = %r{(:[^ ]+ )?([^ ]{1,3}*)(.*)}i
+  RE = %r{(:[^ ]+ )?([^ ]*)(.*)}i
 
   def self.parse(line)
     md = RE.match(line) or raise("invalid input: #{line.inspect}")
