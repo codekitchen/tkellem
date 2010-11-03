@@ -1,15 +1,24 @@
+#     $ bin/tkellem examples/config.yml
+#
+# to connect: connect to localhost port 10001, ssl enabled, "real name" set to
+#
+#     <connection_name> <client_name>
+#
+# e.g.:
+#
+#     freenode laptop
 --- 
-- name: freenode
-  ssl: false
-  nick: tkellem_r0ck
-  port: 6667
-  rooms: 
-  - name: "#tkellem_test"
-  host: irc.freenode.org
-  clients: 
-  - name: laptop
-    ssl: true
-    port: 10001
-  - name: iphone
-    ssl: true
-    port: 10002
+listen: 0.0.0.0
+port: 10001
+ssl: true
+connections: 
+  freenode:
+    host: irc.freenode.org
+    port: 6667
+    ssl: false
+    nick: tkellem_r0ck
+    rooms: 
+    - name: "#tkellem_test"
+    clients: 
+    - name: laptop
+    - name: iphone

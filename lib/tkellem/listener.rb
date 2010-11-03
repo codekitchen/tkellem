@@ -6,8 +6,9 @@ require 'tkellem/bouncer'
 module Listener
   include EM::Protocols::LineText2
 
-  def initialize(config)
+  def initialize(name, config)
     set_delimiter "\r\n"
+    @name = name
     @config = config
     @welcomes = []
     @rooms = []
@@ -15,14 +16,8 @@ module Listener
     @active_conns = []
     @nick = nil
     @joined_rooms = false
-
-    config['clients'].each do |client|
-      EM.start_server("0.0.0.0", client['port'], BouncerConnection,
-                      self, config, client)
-      bouncers[client['name']] = Bouncer.new(client['name'])
-    end
   end
-  attr_reader :config, :bouncers, :welcomes, :rooms, :nick, :active_conns
+  attr_reader :name, :config, :bouncers, :welcomes, :rooms, :nick, :active_conns
 
   def post_init
     if config['ssl']
@@ -83,10 +78,12 @@ module Listener
   end
 
   def debug(line)
-    puts "#{config['name']}: #{line}"
+    puts "#{name}: #{line}"
   end
 
   def unbind
+    debug "OMG we got disconnected. everybody dies."
+    # TODO: don't die
     EM.stop
   end
 

@@ -5,41 +5,89 @@ require 'tkellem/bouncer'
 module BouncerConnection
   include EM::Protocols::LineText2
 
-  def initialize(listener, server_config, config)
+  @listeners = {}
+  def self.listeners; @listeners; end
+
+  def initialize(config)
     set_delimiter "\r\n"
-    @listener = listener
-    @server_config = server_config
     @config = config
     @backlog = []
+    @listener = nil
+    @bouncer = nil
+    @nick = nil
+    @conn_config = nil
   end
-  attr_reader :server_config, :config, :listener, :backlog, :bouncer
+  attr_reader :config, :listener, :backlog, :bouncer, :nick, :conn_config
+
+  def connected?
+    !!listener
+  end
+
+  def name
+    conn_config['name']
+  end
 
   def post_init
     if config['ssl']
       debug "starting TLS"
       start_tls :verify_peer => false
-    else
-      ssl_handshake_completed
     end
   end
 
   def ssl_handshake_completed
     debug "TLS complete"
-    # TODO: Auth
+  end
+
+  def connect(conn_name, client_name, password)
+    @listener = BouncerConnection.listeners[conn_name.downcase]
+    unless listener
+      send_msg(":tkellem!tkellem@tkellem PRIVMSG #{nick} :Unknown connection #{conn_name}")
+      return
+    end
+
+    @conn_config = config['connections'][conn_name]['clients'].find { |c| c['name'] == client_name }
+    unless conn_config
+      send_msg(":tkellem!tkellem@tkellem PRIVMSG #{nick} :Unknown client #{client_name}, did you mean one of [#{config['connections'][conn_name]['clients'].map { |c| c['name'] }.join(", ")}]")
+      return
+    end
+
+    # TODO: password auth
+
     @bouncer = listener.bouncer_connect(self)
+
+    listener.send_welcome(self)
+    bouncer.send_backlog(self)
+    listener.rooms.each { |room| simulate_join(room) }
+  end
+
+  def tkellem(msg)
+    case msg.args.first
+    when /nothing_yet/i
+    else
+      send_msg(":tkellem!tkellem@tkellem PRIVMSG #{nick} :Unknown tkellem command #{msg.args.first}")
+    end
   end
 
   def receive_line(line)
+    debug "client sez: #{line.inspect}"
     msg = IrcLine.parse(line)
     case msg.command
+    when /tkellem/i
+      tkellem(msg)
+    when /pass/i
+      @password = msg.args.first
     when /user/i
-      listener.send_welcome(self)
-      bouncer.send_backlog(self)
-      listener.rooms.each { |room| simulate_join(room) }
+      conn_name, client_name = msg.args.last.strip.split(' ')
+      connect(conn_name, client_name, @password)
     when /nick/i
-      listener.change_nick(msg.last)
+      if connected?
+        listener.change_nick(msg.last)
+      else
+        @nick = msg.last
+      end
     when /quit/i
       # DENIED
+      close_connection
     else
       # pay it forward
       debug("got #{line.inspect}")
@@ -72,11 +120,11 @@ module BouncerConnection
     puts "#{config['name']}: #{line}"
   end
 
-  def name
-    config['name']
+  def unbind
+    listener.bouncer_disconnect(self) if connected?
   end
 
-  def unbind
-    listener.bouncer_disconnect(self)
+  def self.add_listener(listener)
+    @listeners[listener.name.downcase] = listener
   end
 end

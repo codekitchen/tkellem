@@ -19,13 +19,22 @@ opts.on_tail("-h", "--help") { puts opts; exit }
 rest = opts.parse(ARGV)
 config_filename = rest.first || File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
 
-configs = YAML.load_file(config_filename)
+config = YAML.load_file(config_filename)
 
 $LOAD_PATH.push(File.expand_path(File.dirname(__FILE__)+'/../lib'))
 require 'tkellem'
 
 EM.run do
-  configs.each do |config|
-    EM.connect(config['host'], config['port'], Listener, config)
+  EM.start_server(config['listen'] || '0.0.0.0', config['port'] || 10001,
+                  BouncerConnection, config)
+
+  config['connections'].each do |name, conn_config|
+    listener = EM.connect(conn_config['host'], conn_config['port'],
+                          Listener, name, conn_config)
+    BouncerConnection.add_listener(listener)
+
+    conn_config['clients'].each do |client|
+      listener.bouncers[client['name']] = Bouncer.new(client['name'])
+    end
   end
 end
