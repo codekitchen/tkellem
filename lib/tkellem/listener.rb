@@ -52,6 +52,8 @@ module Listener
     when /3\d\d/
       # transient response -- we want to forward these, but not backlog
       active_conns.each { |conn| conn.transient_response(msg) }
+    when /ping/i
+      send_msg("PONG #{nick}!tkellem #{msg.args.first}")
     else
       debug("got #{line.inspect}")
       bouncers.each { |name, bouncer| bouncer.handle_message(msg) }
