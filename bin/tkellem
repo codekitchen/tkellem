@@ -17,7 +17,7 @@ BANNER
 opts.on_tail("-h", "--help") { puts opts; exit }
 
 rest = opts.parse(ARGV)
-config_filename = rest.first or File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
+config_filename = rest.first || File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
 
 configs = YAML.load_file(config_filename)
 
