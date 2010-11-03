@@ -37,14 +37,17 @@ module Listener
 
   def receive_line(line)
     msg = IrcLine.parse(line)
+
+    if msg.command.match(/join/i)
+      debug("joined #{msg.last}")
+      rooms << msg.last
+    end
+
     case msg.command
     when /0\d\d/, /2[56]\d/, /37[256]/
       welcomes << msg
       got_welcome
-    when /join/i
-      debug("joined #{msg.last}")
-      rooms << msg.last
-    when /3\d\d/
+    when /3\d\d/, /join/i
       # transient response -- we want to forward these, but not backlog
       active_conns.each { |conn| conn.transient_response(msg) }
     when /ping/i
