@@ -1,3 +1,5 @@
+module Tkellem
+
 class IrcLine
   RE = %r{(:[^ ]+ )?([^ ]*)(.*)}i
 
@@ -35,4 +37,6 @@ class IrcLine
   def last
     args.last
   end
+end
+
 end

@@ -1,6 +1,8 @@
 require 'tkellem/irc_line'
 
-class Bouncer
+module Tkellem
+
+class Backlog
   def initialize(name)
     @name = name
     @backlog = []
@@ -33,10 +35,6 @@ class Bouncer
     active_conns.delete(bouncer_conn)
   end
 
-  def relay(msg)
-    active_conns.each { |c| c.send_msg(msg) }
-  end
-
   def send_backlog(conn, pm_target = nil)
     if pm_target
       # send room-specific backlog
@@ -50,4 +48,6 @@ class Bouncer
       conn.send_msg(msgs.shift)
     end
   end
+end
+
 end

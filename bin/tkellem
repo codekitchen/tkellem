@@ -25,16 +25,17 @@ $LOAD_PATH.push(File.expand_path(File.dirname(__FILE__)+'/../lib'))
 require 'tkellem'
 
 EM.run do
-  EM.start_server(config['listen'] || '0.0.0.0', config['port'] || 10001,
-                  BouncerConnection, config)
+  bouncer =
+    Tkellem::Bouncer.new(config['listen'] || '0.0.0.0',
+                         config['port'] || 10001,
+                         config['ssl'])
 
-  config['connections'].each do |name, conn_config|
-    listener = EM.connect(conn_config['host'], conn_config['port'],
-                          Listener, name, conn_config)
-    BouncerConnection.add_listener(listener)
+  config['connections'].each do |name, conn|
+    server = bouncer.add_irc_server(name,
+                                    conn['host'], conn['port'], conn['ssl'],
+                                    conn['nick'])
 
-    conn_config['clients'].each do |client|
-      listener.bouncers[client['name']] = Bouncer.new(client['name'])
-    end
+    (conn['rooms'] || []).each { |room| server.join_room(room['name']) }
+    conn['clients'].each { |client| server.add_client(client['name']) }
   end
 end
