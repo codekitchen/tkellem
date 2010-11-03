@@ -11,7 +11,7 @@ module Listener
     @name = name
     @config = config
     @welcomes = []
-    @rooms = []
+    @rooms = Set.new
     @bouncers = {}
     @active_conns = []
     @nick = nil
