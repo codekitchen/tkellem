@@ -34,6 +34,7 @@ module BouncerConnection
     case msg.command
     when /user/i
       listener.send_welcome(self)
+      bouncer.send_backlog(self)
       listener.rooms.each { |room| simulate_join(room) }
     when /nick/i
       listener.change_nick(msg.last)
@@ -53,7 +54,7 @@ module BouncerConnection
     listener.send_msg("NAMES #{room}\r\n")
   end
 
-  def name_response(msg)
+  def transient_response(msg)
     send_msg(msg)
     if msg.command == "366"
       # finished joining this room, let's backlog it

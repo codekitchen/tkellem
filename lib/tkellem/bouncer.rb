@@ -13,14 +13,15 @@ class Bouncer
     if !active_conns.empty?
       active_conns.each { |conn| conn.send_msg(msg) }
     else
-      if msg.command.match(/privmsg/i)
+      if msg.command.match(/privmsg/i) && msg.args.first.match(/^#/)
         # privmsg always goes in a specific backlog
         pm_target = msg.args.first
-        pm_backlogs[pm_target].push msg
+        bl = pm_backlogs[pm_target]
       else
         # other messages go in the general backlog
-        backlog.push msg
+        bl = backlog
       end
+      bl.push(msg)
     end
   end
 
@@ -36,8 +37,15 @@ class Bouncer
     active_conns.each { |c| c.send_msg(msg) }
   end
 
-  def send_backlog(conn, pm_target)
-    msgs = pm_backlogs.key?(pm_target) ? pm_backlogs[pm_target] : []
+  def send_backlog(conn, pm_target = nil)
+    if pm_target
+      # send room-specific backlog
+      msgs = pm_backlogs.key?(pm_target) ? pm_backlogs[pm_target] : []
+    else
+      # send the general backlog
+      msgs = backlog
+    end
+
     until msgs.empty?
       conn.send_msg(msgs.shift)
     end

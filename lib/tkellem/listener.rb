@@ -43,14 +43,15 @@ module Listener
   def receive_line(line)
     msg = IrcLine.parse(line)
     case msg.command
-    when /0\d\d/, /25?|26?/
+    when /0\d\d/, /2[56]\d/, /37[256]/
       welcomes << msg
       got_welcome
     when /join/i
       debug("joined #{msg.last}")
       rooms << msg.last
-    when /353|366/ # NAMES response
-      active_conns.each { |conn| conn.name_response(msg) }
+    when /3\d\d/
+      # transient response -- we want to forward these, but not backlog
+      active_conns.each { |conn| conn.transient_response(msg) }
     else
       debug("got #{line.inspect}")
       bouncers.each { |name, bouncer| bouncer.handle_message(msg) }
