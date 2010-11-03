@@ -14,4 +14,4 @@ You probably don't want this yet.
 
 ## Usage
 
-bin/tkellem examples/config.yml
+    bin/tkellem examples/config.yml

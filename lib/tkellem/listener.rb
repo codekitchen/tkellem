@@ -36,7 +36,7 @@ module Listener
   def ssl_handshake_completed
     debug "TLS complete"
     # send USER
-    send_msg("USER BipIt localhost #{config['host']} :Testing")
+    send_msg("USER tkellem localhost #{config['host']} :Testing")
     change_nick(config['nick'])
   end
 
