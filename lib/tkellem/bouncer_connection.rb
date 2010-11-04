@@ -94,9 +94,13 @@ module BouncerConnection
       # DENIED
       close_connection
     else
-      # pay it forward
-      debug("got #{line.inspect}")
-      irc_server.send_msg(msg)
+      if !connected?
+        close_connection
+      else
+        # pay it forward
+        debug("got #{line.inspect}")
+        irc_server.send_msg(msg)
+      end
     end
   end
 
