@@ -32,5 +32,17 @@ module Tkellem
     def get_irc_server(name)
       @irc_servers[name]
     end
+
+    def on_authenticate(&block)
+      @auth_block = block
+    end
+
+    def do_auth(username, password, irc_server)
+      if @auth_block
+        @auth_block.call(username, password.to_s, irc_server)
+      else
+        true
+      end
+    end
   end
 end

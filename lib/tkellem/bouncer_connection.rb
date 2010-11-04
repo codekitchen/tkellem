@@ -13,7 +13,6 @@ module BouncerConnection
     @ssl = do_ssl
     @bouncer = bouncer
 
-    @backlog = []
     @irc_server = nil
     @backlog = nil
     @nick = nil
@@ -43,10 +42,15 @@ module BouncerConnection
     debug "TLS complete"
   end
 
+  def error!(msg)
+    send_msg("ERROR :#{msg}")
+    close_connection(true)
+  end
+
   def connect(conn_name, client_name, password)
     @irc_server = bouncer.get_irc_server(conn_name.downcase)
     unless irc_server
-      send_msg(":tkellem!tkellem@tkellem PRIVMSG you :Unknown connection #{conn_name}")
+      error!("unknown connection #{conn_name}")
       return
     end
 
@@ -54,11 +58,16 @@ module BouncerConnection
     @name = client_name
     @backlog = irc_server.bouncer_connect(self)
     unless backlog
-      send_msg(":tkellem!tkellem@tkellem PRIVMSG you :Unknown client #{client_name}")
+      error!("unknown client #{client_name}")
+      @irc_server = @conn_name = @name = nil
       return
     end
 
-    # TODO: password auth
+    unless bouncer.do_auth(conn_name, @password, irc_server)
+      error!("bad auth, please check your password")
+      @irc_server = @conn_name = @name = @backlog = nil
+      return
+    end
 
     irc_server.send_welcome(self)
     backlog.send_backlog(self)

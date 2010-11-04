@@ -17,6 +17,10 @@ connections:
     port: 6667
     ssl: false
     nick: tkellem_r0ck
+    # Uncomment to enable password auth (there's no auth by default, which
+    # means anybody can connect). You can generate a password_sha1 like so:
+    #     echo -n 'tkellem_r0ck' | openssl sha1
+    password_sha1: a4f4a3b97c7b8a028d4e3f3fee85d6e5626baba5
     rooms: 
     - name: "#tkellem_test"
     clients: 

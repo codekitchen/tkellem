@@ -30,6 +30,16 @@ EM.run do
                          config['port'] || 10001,
                          config['ssl'])
 
+  bouncer.on_authenticate do |username, password, irc_server|
+    server_config = config['connections'][irc_server.name]
+    if server_config && password_sha1 = server_config['password_sha1']
+      require 'openssl'
+      password_sha1 == OpenSSL::Digest::SHA1.hexdigest(password)
+    else
+      true
+    end
+  end
+
   config['connections'].each do |name, conn|
     server = bouncer.add_irc_server(name,
                                     conn['host'], conn['port'], conn['ssl'],
