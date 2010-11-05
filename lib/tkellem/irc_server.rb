@@ -98,7 +98,17 @@ module IrcServer
   end
 
   def add_client(name)
-      backlogs[name] = Backlog.new(name)
+    return if backlogs[name]
+    backlogs[name] = Backlog.new(name)
+  end
+
+  def remove_client(name)
+    backlog = backlogs.delete(name)
+    if backlog
+      backlog.active_conns.each do |conn|
+        conn.error!("client removed")
+      end
+    end
   end
 
   def send_msg(msg)
@@ -111,9 +121,10 @@ module IrcServer
   end
 
   def unbind
-    debug "OMG we got disconnected. everybody dies."
-    # TODO: don't die
-    EM.stop
+    debug "OMG we got disconnected."
+    # TODO: reconnect if desired. but not if this server was explicitly shut
+    # down or removed.
+    backlogs.keys.each { |name| remove_client(name) }
   end
 
   def bouncer_connect(bouncer_conn)
@@ -125,6 +136,8 @@ module IrcServer
   end
 
   def bouncer_disconnect(bouncer_conn)
+    return nil unless backlogs[bouncer_conn.name]
+
     backlogs[bouncer_conn.name].remove_conn(bouncer_conn)
     active_conns.delete(bouncer_conn)
   end

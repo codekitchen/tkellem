@@ -14,6 +14,13 @@ module Tkellem
       @irc_servers[name] = EM.connect(host, port, IrcServer, self, name, do_ssl, nick)
     end
 
+    def remove_irc_server(name)
+      server = @irc_servers.delete(name)
+      if server
+        server.close_connection(true)
+      end
+    end
+
     def on_authenticate(&block)
       @auth_block = block
     end

@@ -40,7 +40,7 @@ EM.run do
     end
   end
 
-  config['connections'].each do |name, conn|
+  def add_irc_server(bouncer, name, conn)
     server = bouncer.add_irc_server(name,
                                     conn['host'], conn['port'], conn['ssl'],
                                     conn['nick'])
@@ -48,4 +48,59 @@ EM.run do
     (conn['rooms'] || []).each { |room| server.join_room(room['name']) }
     conn['clients'].each { |client| server.add_client(client['name']) }
   end
+
+  config['connections'].each do |name, conn|
+    Tkellem::EasyLogger.logger.info("adding new connection #{name}")
+    add_irc_server(bouncer, name, conn)
+  end
+
+  Signal.trap('HUP') do
+    Tkellem::EasyLogger.logger.warn("got HUP, reloading #{config_filename}")
+    new_config = YAML.load_file(config_filename)
+
+    # find changed connections
+    to_delete = config['connections'].keys
+
+    new_config['connections'].each do |name, new_conn|
+      to_delete.delete(name)
+      conn = config['connections'][name]
+      if !conn
+        Tkellem::EasyLogger.logger.info("adding new connection #{name}")
+        add_irc_server(bouncer, name, new_conn)
+      else
+        if new_conn['host'] != conn['host'] || new_conn['port'] != conn['port'] || new_conn['ssl'] != conn['ssl']
+          Tkellem::EasyLogger.logger.info("server settings changed for #{name}, dropping clients and reconnecting")
+          bouncer.remove_irc_server(name)
+          add_irc_server(bouncer, name, new_conn)
+        elsif conn['clients'] != new_conn['clients']
+          irc_server = bouncer.get_irc_server(name)
+
+          # we don't have to reconnect, but maybe clients changed. we ignore
+          # changes to nick and rooms on HUP, since those are dynamic once tkellem
+          # connects.  password change will be caught on the next client
+          # connect.
+          clients_to_delete = conn['clients'].map { |c| c['name'] }
+          new_conn['clients'].each do |new_client|
+            clients_to_delete.delete(new_client['name'])
+            # add -- if already exists, this is a no-op. this may change in the
+            # future though...
+            Tkellem::EasyLogger.logger.info("adding client #{new_client['name']} to server #{name}")
+            irc_server.add_client(new_client['name'])
+          end
+          clients_to_delete.each do |client_name|
+            Tkellem::EasyLogger.logger.info("removing client #{client_name} from server #{name}")
+            irc_server.remove_client(client_name) if irc_server
+          end
+        end
+      end
+    end
+
+    to_delete.each do |name|
+      Tkellem::EasyLogger.logger.info("deleting connection #{name}")
+      bouncer.remove_irc_server(name)
+    end
+
+    config = new_config
+  end
+
 end
