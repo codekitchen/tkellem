@@ -59,6 +59,9 @@ module IrcServer
       active_conns.each { |conn| conn.transient_response(msg) }
     when /ping/i
       send_msg("PONG #{nick}!tkellem #{msg.args.first}")
+    when /pong/i
+      # swallow it, we handle ping-pong from clients separately, in
+      # BouncerConnection
     else
       debug("got #{line.inspect}")
       backlogs.each { |name, backlog| backlog.handle_message(msg) }

@@ -102,6 +102,8 @@ module BouncerConnection
     when /quit/i
       # DENIED
       close_connection
+    when /ping/i
+      send_msg(":tkellem PONG tkellem :#{msg.last}")
     else
       if !connected?
         close_connection
