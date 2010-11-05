@@ -2,6 +2,11 @@ require 'tkellem/irc_line'
 
 module Tkellem
 
+# Normally there will be one client per backlog, but there can be more than one
+# connection for the same backlog, if two or more IRC clients connect with the
+# same client name. That situation is equivalent to how most multi-connection
+# bouncers like bip work.
+
 class Backlog
   def initialize(name)
     @name = name
@@ -12,11 +17,21 @@ class Backlog
   attr_reader :name, :backlog, :active_conns, :pm_backlogs
 
   def handle_message(msg)
+    # TODO: only send back response messages like WHO, NAMES, etc. to the
+    # BouncerConnection that requested it.
     if !active_conns.empty?
-      active_conns.each { |conn| conn.send_msg(msg) }
-    else
-      if msg.command.match(/privmsg/i) && msg.args.first.match(/^#/)
-        # privmsg always goes in a specific backlog
+      case msg.command
+      when /3\d\d/, /join/i
+        # transient response -- we want to forward these, but not backlog
+        active_conns.each { |conn| conn.transient_response(msg) }
+      when /privmsg/i
+        active_conns.each { |conn| conn.send_msg(msg) }
+      else
+        # do nothing?
+      end
+    elsif msg.command.match(/privmsg/i)
+      if msg.args.first.match(/^#/)
+        # room privmsg always goes in a specific backlog
         pm_target = msg.args.first
         bl = pm_backlogs[pm_target]
       else

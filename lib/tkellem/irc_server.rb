@@ -8,6 +8,7 @@ module Tkellem
 
 module IrcServer
   include EM::Protocols::LineText2
+  include Tkellem::EasyLogger
 
   def initialize(bouncer, name, do_ssl, nick)
     set_delimiter "\r\n"
@@ -17,6 +18,7 @@ module IrcServer
     @ssl = do_ssl
     @nick = nick
 
+    @connected = false
     @welcomes = []
     @rooms = Set.new
     @backlogs = {}
@@ -25,10 +27,16 @@ module IrcServer
     @pending_rooms = []
   end
   attr_reader :name, :backlogs, :welcomes, :rooms, :nick, :active_conns
+  alias_method :log_name, :name
+
+  def connected?
+    @connected
+  end
 
   def post_init
     if @ssl
       debug "starting TLS"
+      # TODO: support strict cert checks
       start_tls :verify_peer => false
     else
       ssl_handshake_completed
@@ -36,36 +44,31 @@ module IrcServer
   end
 
   def ssl_handshake_completed
-    debug "TLS complete"
     # TODO: support sending a real username, realname, etc
-    send_msg("USER #{@nick} localhost blah :Testing")
-    change_nick(@nick, true)
+    send_msg("USER #{nick} localhost blah :#{nick}")
+    change_nick(nick, true)
   end
 
   def receive_line(line)
+    trace "from server: #{line}"
     msg = IrcLine.parse(line)
-
-    if msg.command.match(/join/i)
-      debug("joined #{msg.last}")
-      rooms << msg.last
-    end
 
     case msg.command
     when /0\d\d/, /2[56]\d/, /37[256]/
       welcomes << msg
-      got_welcome
-    when /3\d\d/, /join/i
-      # transient response -- we want to forward these, but not backlog
-      active_conns.each { |conn| conn.transient_response(msg) }
+      got_welcome if msg.command == "376" # end of MOTD
+    when /join/i
+      debug "joined #{msg.last}"
+      rooms << msg.last
     when /ping/i
       send_msg("PONG #{nick}!tkellem #{msg.args.first}")
     when /pong/i
       # swallow it, we handle ping-pong from clients separately, in
       # BouncerConnection
     else
-      debug("got #{line.inspect}")
-      backlogs.each { |name, backlog| backlog.handle_message(msg) }
     end
+
+    backlogs.each { |name, backlog| backlog.handle_message(msg) }
   end
 
   def got_welcome
@@ -77,7 +80,7 @@ module IrcServer
     @pending_rooms.clear
 
     # We're all initialized, allow connections
-    @bouncer.irc_server_ready(self)
+    @connected = true
   end
 
   def change_nick(new_nick, force = false)
@@ -99,15 +102,12 @@ module IrcServer
   end
 
   def send_msg(msg)
+    trace "to server: #{msg}"
     send_data("#{msg}\r\n")
   end
 
   def send_welcome(bouncer_conn)
     welcomes.each { |msg| bouncer_conn.send_msg(msg) }
-  end
-
-  def debug(line)
-    puts "#{name}: #{line}"
   end
 
   def unbind

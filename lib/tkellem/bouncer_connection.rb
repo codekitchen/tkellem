@@ -6,6 +6,7 @@ module Tkellem
 
 module BouncerConnection
   include EM::Protocols::LineText2
+  include Tkellem::EasyLogger
 
   def initialize(bouncer, do_ssl)
     set_delimiter "\r\n"
@@ -19,20 +20,18 @@ module BouncerConnection
     @conn_name = nil
     @name = nil
   end
-  attr_reader :ssl, :irc_server, :backlog, :bouncer, :nick, :name
+  attr_reader :ssl, :irc_server, :backlog, :bouncer, :nick
 
   def connected?
     !!irc_server
   end
 
   def name
-    @name || "BouncerConnection.new"
+    @name || "new-conn"
   end
 
-  def ssl?; ssl; end
-
   def post_init
-    if ssl?
+    if ssl
       debug "starting TLS"
       start_tls :verify_peer => false
     end
@@ -43,14 +42,21 @@ module BouncerConnection
   end
 
   def error!(msg)
+    info("ERROR :#{msg}")
     send_msg("ERROR :#{msg}")
     close_connection(true)
   end
 
   def connect(conn_name, client_name, password)
     @irc_server = bouncer.get_irc_server(conn_name.downcase)
-    unless irc_server
+    unless irc_server && irc_server.connected?
       error!("unknown connection #{conn_name}")
+      return
+    end
+
+    unless bouncer.do_auth(conn_name, @password, irc_server)
+      error!("bad auth, please check your password")
+      @irc_server = @conn_name = @name = @backlog = nil
       return
     end
 
@@ -63,11 +69,7 @@ module BouncerConnection
       return
     end
 
-    unless bouncer.do_auth(conn_name, @password, irc_server)
-      error!("bad auth, please check your password")
-      @irc_server = @conn_name = @name = @backlog = nil
-      return
-    end
+    info "connected"
 
     irc_server.send_welcome(self)
     backlog.send_backlog(self)
@@ -83,7 +85,7 @@ module BouncerConnection
   end
 
   def receive_line(line)
-    debug "client sez: #{line.inspect}"
+    trace "from client: #{line}"
     msg = IrcLine.parse(line)
     case msg.command
     when /tkellem/i
@@ -109,7 +111,6 @@ module BouncerConnection
         close_connection
       else
         # pay it forward
-        debug("got #{line.inspect}")
         irc_server.send_msg(msg)
       end
     end
@@ -132,12 +133,12 @@ module BouncerConnection
   end
 
   def send_msg(msg)
-    # debug("sending: #{msg}")
+    trace "to client: #{msg}"
     send_data("#{msg}\r\n")
   end
 
-  def debug(line)
-    puts "#{@conn_name}-#{name}: #{line}"
+  def log_name
+    "#{@conn_name}-#{name}"
   end
 
   def unbind
