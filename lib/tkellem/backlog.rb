@@ -25,7 +25,7 @@ class Backlog
     # BouncerConnection that requested it.
     if !active_conns.empty?
       case msg.command
-      when /3\d\d/, /join/i
+      when /3\d\d/, /join/i, /part/i
         # transient response -- we want to forward these, but not backlog
         active_conns.each { |conn| conn.transient_response(msg) }
       when /privmsg/i
