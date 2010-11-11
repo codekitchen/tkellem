@@ -11,6 +11,7 @@
 listen: 0.0.0.0
 port: 10001
 ssl: true
+# max_backlog: 500
 connections: 
   freenode:
     host: irc.freenode.org

@@ -12,13 +12,14 @@ class Backlog
   class BacklogLine < Struct.new(:irc_line, :time)
   end
 
-  def initialize(name)
+  def initialize(name, max_backlog = nil)
     @name = name
     @backlog = []
     @pm_backlogs = Hash.new { |h,k| h[k] = [] }
     @active_conns = []
+    @max_backlog = max_backlog
   end
-  attr_reader :name, :backlog, :active_conns, :pm_backlogs
+  attr_reader :name, :backlog, :active_conns, :pm_backlogs, :max_backlog
 
   def handle_message(msg)
     # TODO: only send back response messages like WHO, NAMES, etc. to the
@@ -43,7 +44,18 @@ class Backlog
         bl = backlog
       end
       bl.push(BacklogLine.new(msg, Time.now))
+      limit_backlog(bl)
     end
+  end
+
+  def limit_backlog(bl)
+    bl.shift until !max_backlog || bl.size <= max_backlog
+  end
+
+  def max_backlog=(new_val)
+    @max_backlog = new_val
+    limit_backlog(backlog)
+    pm_backlogs.each { |k,bl| limit_backlog(bl) }
   end
 
   def add_conn(bouncer_conn)

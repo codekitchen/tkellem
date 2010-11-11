@@ -18,6 +18,7 @@ module IrcServer
     @ssl = do_ssl
     @nick = nick
 
+    @max_backlog = nil
     @connected = false
     @welcomes = []
     @rooms = Set.new
@@ -31,6 +32,11 @@ module IrcServer
 
   def connected?
     @connected
+  end
+
+  def set_max_backlog(max_backlog)
+    @max_backlog = max_backlog
+    backlogs.each { |name, backlog| backlog.max_backlog = max_backlog }
   end
 
   def post_init
@@ -99,7 +105,8 @@ module IrcServer
 
   def add_client(name)
     return if backlogs[name]
-    backlogs[name] = Backlog.new(name)
+    backlog = Backlog.new(name, @max_backlog)
+    backlogs[name] = backlog
   end
 
   def remove_client(name)

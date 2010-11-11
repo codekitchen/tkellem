@@ -30,6 +30,8 @@ EM.run do
                          config['port'] || 10001,
                          config['ssl'])
 
+  bouncer.max_backlog = config['max_backlog'].to_i
+
   bouncer.on_authenticate do |username, password, irc_server|
     server_config = config['connections'][irc_server.name]
     if server_config && password_sha1 = server_config['password_sha1']
@@ -57,6 +59,8 @@ EM.run do
   Signal.trap('HUP') do
     Tkellem::EasyLogger.logger.warn("got HUP, reloading #{config_filename}")
     new_config = YAML.load_file(config_filename)
+
+    bouncer.max_backlog = new_config['max_backlog'].to_i
 
     # find changed connections
     to_delete = config['connections'].keys
