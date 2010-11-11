@@ -37,6 +37,11 @@ class IrcLine
   def last
     args.last
   end
+
+  def with_timestamp(timestamp)
+    [prefix, command, *args[0..-2], "#{timestamp.strftime("%H:%M:%S")}> #{args.last}"].join(' ')
+  end
+
 end
 
 end

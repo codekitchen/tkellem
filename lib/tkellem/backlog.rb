@@ -8,6 +8,10 @@ module Tkellem
 # bouncers like bip work.
 
 class Backlog
+
+  class BacklogLine < Struct.new(:irc_line, :time)
+  end
+
   def initialize(name)
     @name = name
     @backlog = []
@@ -38,7 +42,7 @@ class Backlog
         # other messages go in the general backlog
         bl = backlog
       end
-      bl.push(msg)
+      bl.push(BacklogLine.new(msg, Time.now))
     end
   end
 
@@ -60,7 +64,8 @@ class Backlog
     end
 
     until msgs.empty?
-      conn.send_msg(msgs.shift)
+      backlog_line = msgs.shift
+      conn.send_msg(backlog_line.irc_line.with_timestamp(backlog_line.time))
     end
   end
 end
