@@ -38,6 +38,14 @@ class IrcLine
     args.last
   end
 
+  def target_user
+    if prefix && md = %r{^:([^!]+)}.match(prefix)
+      md[1]
+    else
+      nil
+    end
+  end
+
   def with_timestamp(timestamp)
     new_command = [prefix, command]
     new_command += args[0..-2]

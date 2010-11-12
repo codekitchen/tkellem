@@ -64,8 +64,11 @@ module IrcServer
       welcomes << msg
       got_welcome if msg.command == "376" # end of MOTD
     when /join/i
-      debug "joined #{msg.last}"
-      rooms << msg.last
+      debug "#{msg.target_user} joined #{msg.last}"
+      rooms << msg.last if msg.target_user == nick
+    when /part/i
+      debug "#{msg.target_user} left #{msg.last}"
+      rooms.delete(msg.last) if msg.target_user == nick
     when /ping/i
       send_msg("PONG #{nick}!tkellem #{msg.args.first}")
     when /pong/i
