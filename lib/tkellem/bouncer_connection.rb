@@ -54,7 +54,7 @@ module BouncerConnection
       return
     end
 
-    unless bouncer.do_auth(conn_name, @password, irc_server)
+    unless bouncer.do_auth(@nick, @password, irc_server)
       error!("bad auth, please check your password")
       @irc_server = @conn_name = @name = @backlog = nil
       return
@@ -93,13 +93,13 @@ module BouncerConnection
     when /pass/i
       @password = msg.args.first
     when /user/i
-      conn_name, client_name = msg.args.last.strip.split(' ')
-      connect(conn_name, client_name, @password)
+      @conn_name, @client_name = msg.args.last.strip.split(' ')
     when /nick/i
       if connected?
         irc_server.change_nick(msg.last)
       else
         @nick = msg.last
+        connect(@conn_name, @client_name, @password)
       end
     when /quit/i
       # DENIED
