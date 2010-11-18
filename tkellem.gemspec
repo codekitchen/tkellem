@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{tkellem}
-  s.version = "0.7.0"
+  s.version = "0.7.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brian Palmer"]
-  s.date = %q{2010-11-17}
+  s.date = %q{2010-11-18}
   s.default_executable = %q{tkellem}
   s.email = %q{brian@codekitchen.net}
   s.executables = ["tkellem"]
@@ -30,7 +30,8 @@ Gem::Specification.new do |s|
     "lib/tkellem/bouncer_connection.rb",
     "lib/tkellem/irc_line.rb",
     "lib/tkellem/irc_server.rb",
-    "spec/spec_helper.rb"
+    "spec/spec_helper.rb",
+    "tkellem.gemspec"
   ]
   s.homepage = %q{http://github.com/codekitchen/tkellem}
   s.require_paths = ["lib"]
