@@ -1,5 +1,5 @@
 tkellem (0.7.1-1) unstable; urgency=low
 
-  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+  * Initial packaging
 
- -- paul cannon <paul@riptano.com>  Thu, 16 Dec 2010 11:58:18 -0600
+ -- paul cannon <pik@debian.org>  Thu, 16 Dec 2010 11:58:18 -0600

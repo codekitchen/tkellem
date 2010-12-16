@@ -1,0 +1,3 @@
+bin/tkellem       /usr/bin
+lib/tkellem.rb    /usr/lib/ruby/1.8
+lib/tkellem/*.rb  /usr/lib/ruby/1.8/tkellem
