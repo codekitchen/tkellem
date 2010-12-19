@@ -70,7 +70,7 @@ module IrcServer
       debug "#{msg.target_user} left #{msg.last}"
       rooms.delete(msg.last) if msg.target_user == nick
     when /ping/i
-      send_msg("PONG #{nick}!tkellem #{msg.args.first}")
+      send_msg("PONG #{nick}!tkellem :#{msg.last}")
     when /pong/i
       # swallow it, we handle ping-pong from clients separately, in
       # BouncerConnection
