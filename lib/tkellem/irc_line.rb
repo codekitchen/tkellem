@@ -1,28 +1,25 @@
 module Tkellem
 
-class IrcLine
+class IrcLine < Struct.new(:prefix, :command, :args, :ext_arg)
   RE = %r{(:[^ ]+ )?([^ ]*)(.*)}i
 
   def self.parse(line)
     md = RE.match(line) or raise("invalid input: #{line.inspect}")
 
-    self.new(line, md[1], md[2], md[3])
-  end
-
-  attr_reader :prefix, :command, :args
-
-  def initialize(orig, prefix, command, args)
-    @orig = orig
-    @prefix = prefix ? prefix.strip : nil
-    @command = command
+    prefix = md[1] && md[1][1..-1].strip
+    command = md[2]
+    args = md[3]
+    ext_arg = nil
 
     args.strip!
     idx = args.index(":")
     if idx
-      @args = args[0...idx].split(' ') + [args[idx+1..-1]]
+      args, ext_arg = args[0...idx].split(' '), args[idx+1..-1]
     else
-      @args = args.split(' ')
+      args = args.split(' ')
     end
+
+    self.new(prefix, command, args, ext_arg)
   end
 
   def command?(cmd)
@@ -30,16 +27,21 @@ class IrcLine
   end
 
   def replay
-    @orig
+    line = []
+    line << ":#{prefix}" unless prefix.nil?
+    line << command
+    line += args
+    line << ":#{ext_arg}" unless ext_arg.nil?
+    line.join ' '
   end
   alias_method :to_s, :replay
 
   def last
-    args.last
+    ext_arg || args.last
   end
 
   def target_user
-    if prefix && md = %r{^:([^!]+)}.match(prefix)
+    if prefix && md = %r{^([^!]+)}.match(prefix)
       md[1]
     else
       nil
@@ -47,10 +49,8 @@ class IrcLine
   end
 
   def with_timestamp(timestamp)
-    new_command = [prefix, command]
-    new_command += args[0..-2]
-    new_command.push("#{timestamp.strftime("%H:%M:%S")}> #{args.last}")
-    new_command.join(' ')
+    new_ext_arg = ext_arg && "#{timestamp.strftime("%H:%M:%S")}> #{ext_arg}"
+    IrcLine.new(prefix, command, args, new_ext_arg)
   end
 
 end

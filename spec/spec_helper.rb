@@ -6,5 +6,3 @@ require 'rspec'
 
 RSpec.configure do |config|
 end
-
-puts "Yeah... not so much right now"

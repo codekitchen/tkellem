@@ -93,7 +93,7 @@ module BouncerConnection
     when /pass/i
       @password = msg.args.first
     when /user/i
-      @conn_name, @client_name = msg.args.last.strip.split(' ')
+      @conn_name, @client_name = msg.ext_arg.strip.split(' ')
     when /nick/i
       if connected?
         irc_server.change_nick(msg.last)
