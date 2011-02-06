@@ -91,7 +91,7 @@ module BouncerConnection
     when /tkellem/i
       tkellem(msg)
     when /pass/i
-      @password = msg.args.first
+      @password = msg.args.first || msg.ext_arg
     when /user/i
       @conn_name, @client_name = msg.ext_arg.strip.split(' ')
     when /nick/i
