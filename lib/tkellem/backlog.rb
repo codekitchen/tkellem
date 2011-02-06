@@ -29,10 +29,8 @@ class Backlog
       when /3\d\d/, /join/i, /part/i
         # transient response -- we want to forward these, but not backlog
         active_conns.each { |conn| conn.transient_response(msg) }
-      when /privmsg/i
-        active_conns.each { |conn| conn.send_msg(msg) }
       else
-        # do nothing?
+        active_conns.each { |conn| conn.send_msg(msg) }
       end
     elsif msg.command.match(/privmsg/i)
       if msg.args.first.match(/^#/)
