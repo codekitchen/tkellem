@@ -76,6 +76,12 @@ module BouncerConnection
     irc_server.rooms.each { |room| simulate_join(room) }
   end
 
+  def check_connect
+    if @conn_name && @nick
+      connect(@conn_name, @client_name, @password)
+    end
+  end
+
   def tkellem(msg)
     case msg.args.first
     when /nothing_yet/i
@@ -94,12 +100,13 @@ module BouncerConnection
       @password = msg.args.first || msg.ext_arg
     when /user/i
       @conn_name, @client_name = msg.ext_arg.strip.split(' ')
+      check_connect
     when /nick/i
       if connected?
         irc_server.change_nick(msg.last)
       else
         @nick = msg.last
-        connect(@conn_name, @client_name, @password)
+        check_connect
       end
     when /quit/i
       # DENIED
