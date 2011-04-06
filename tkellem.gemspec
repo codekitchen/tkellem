@@ -18,6 +18,7 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_dependency "eventmachine", "~> 0.12.10"
+  s.add_dependency "daemons", "~> 1.1.0"
 
   s.add_development_dependency "rspec", "~> 2.5"
   s.add_development_dependency "rcov"

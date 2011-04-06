@@ -4,14 +4,26 @@ require 'tkellem/irc_server'
 
 module Tkellem
   class Bouncer
-    def initialize(listen_address, port, do_ssl)
+    def initialize
       @irc_servers = {}
+      @listeners = {}
       @max_backlog = nil
-      @server = EM.start_server(listen_address, port, BouncerConnection,
-                                self, do_ssl)
+    end
+
+    def listen(address, port, do_ssl)
+      @listeners[[address, port]] = EM.start_server(address,
+                                                    port, BouncerConnection,
+                                                    self, do_ssl)
+    end
+
+    def stop_listening(address, port)
+      if server = @listeners[[address, port]]
+        EM.stop_server(server)
+      end
     end
 
     def add_irc_server(name, host, port, do_ssl, nick)
+      raise("server already exists: #{name}") if @irc_servers[name]
       server = EM.connect(host, port, IrcServer, self, name, do_ssl, nick)
       @irc_servers[name] = server
       server.set_max_backlog(@max_backlog) if @max_backlog

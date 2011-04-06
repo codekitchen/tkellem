@@ -1,9 +1,5 @@
 #!/usr/bin/env ruby
 
-begin
-  require 'rubygems'
-rescue LoadError
-end
 require 'yaml'
 require 'optparse'
 
@@ -14,97 +10,31 @@ Usage: #{opts.program_name} PATH_TO_CONFIG
 Start a tkellem instance using the specified configuration file (or ~/.tkellem/config.yml if none given)
 BANNER
 
+daemonize = false
+
 opts.on_tail("-h", "--help") { puts opts; exit }
+opts.on('-d', '--daemonize') { daemonize = true }
 
 rest = opts.parse(ARGV)
 config_filename = rest.first || File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
 
+require 'tkellem/yaml_config_bouncer'
+
 config = YAML.load_file(config_filename)
 
-$LOAD_PATH.push(File.expand_path(File.dirname(__FILE__)+'/../lib'))
-require 'tkellem'
+if daemonize
+  require 'daemons'
+  Daemons.daemonize(:log_output => true,
+                    :backtrace => true,
+                    :app_name => File.basename($0))
+end
 
 EM.run do
-  bouncer =
-    Tkellem::Bouncer.new(config['listen'] || '0.0.0.0',
-                         config['port'] || 10001,
-                         config['ssl'])
-
-  bouncer.max_backlog = config['max_backlog'].to_i
-
-  bouncer.on_authenticate do |username, password, irc_server|
-    server_config = config['connections'][irc_server.name]
-    if server_config && password_sha1 = server_config['password_sha1']
-      require 'openssl'
-      password_sha1 == OpenSSL::Digest::SHA1.hexdigest(password)
-    else
-      true
-    end
-  end
-
-  def add_irc_server(bouncer, name, conn)
-    server = bouncer.add_irc_server(name,
-                                    conn['host'], conn['port'], conn['ssl'],
-                                    conn['nick'])
-
-    (conn['rooms'] || []).each { |room| server.join_room(room['name']) }
-    conn['clients'].each { |client| server.add_client(client['name']) }
-  end
-
-  config['connections'].each do |name, conn|
-    Tkellem::EasyLogger.logger.info("adding new connection #{name}")
-    add_irc_server(bouncer, name, conn)
-  end
+  tkellem = Tkellem::YamlConfigBouncer.new(config)
 
   Signal.trap('HUP') do
-    Tkellem::EasyLogger.logger.warn("got HUP, reloading #{config_filename}")
+    Tkellem::EasyLogger.logger.info("got HUP, reloading #{config_filename}")
     new_config = YAML.load_file(config_filename)
-
-    bouncer.max_backlog = new_config['max_backlog'].to_i
-
-    # find changed connections
-    to_delete = config['connections'].keys
-
-    new_config['connections'].each do |name, new_conn|
-      to_delete.delete(name)
-      conn = config['connections'][name]
-      if !conn
-        Tkellem::EasyLogger.logger.info("adding new connection #{name}")
-        add_irc_server(bouncer, name, new_conn)
-      else
-        if new_conn['host'] != conn['host'] || new_conn['port'] != conn['port'] || new_conn['ssl'] != conn['ssl']
-          Tkellem::EasyLogger.logger.info("server settings changed for #{name}, dropping clients and reconnecting")
-          bouncer.remove_irc_server(name)
-          add_irc_server(bouncer, name, new_conn)
-        elsif conn['clients'] != new_conn['clients']
-          irc_server = bouncer.get_irc_server(name)
-
-          # we don't have to reconnect, but maybe clients changed. we ignore
-          # changes to nick and rooms on HUP, since those are dynamic once tkellem
-          # connects.  password change will be caught on the next client
-          # connect.
-          clients_to_delete = conn['clients'].map { |c| c['name'] }
-          new_conn['clients'].each do |new_client|
-            clients_to_delete.delete(new_client['name'])
-            # add -- if already exists, this is a no-op. this may change in the
-            # future though...
-            Tkellem::EasyLogger.logger.info("adding client #{new_client['name']} to server #{name}")
-            irc_server.add_client(new_client['name'])
-          end
-          clients_to_delete.each do |client_name|
-            Tkellem::EasyLogger.logger.info("removing client #{client_name} from server #{name}")
-            irc_server.remove_client(client_name) if irc_server
-          end
-        end
-      end
-    end
-
-    to_delete.each do |name|
-      Tkellem::EasyLogger.logger.info("deleting connection #{name}")
-      bouncer.remove_irc_server(name)
-    end
-
-    config = new_config
+    tkellem.reload(new_config)
   end
-
 end
