@@ -1,12 +1,6 @@
-begin
-  require 'rubygems'
-rescue LoadError
-end
-
-pathname = File.expand_path(File.dirname(__FILE__))
-$LOAD_PATH.push(pathname) unless $LOAD_PATH.include?(pathname)
-
 module Tkellem
+  VERSION = "0.7.2"
+
   module EasyLogger
     require 'logger'
 
