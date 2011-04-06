@@ -1,5 +1,5 @@
 require 'eventmachine'
-require 'tkellem/irc_line'
+require 'tkellem/irc_message'
 require 'tkellem/backlog'
 
 module Tkellem
@@ -92,27 +92,27 @@ module BouncerConnection
 
   def receive_line(line)
     trace "from client: #{line}"
-    msg = IrcLine.parse(line)
+    msg = IrcMessage.parse(line)
     case msg.command
     when /tkellem/i
       tkellem(msg)
     when /pass/i
-      @password = msg.args.first || msg.ext_arg
+      @password = msg.args.first
     when /user/i
-      @conn_name, @client_name = msg.ext_arg.strip.split(' ')
+      @conn_name, @client_name = msg.args.last.strip.split(' ')
       check_connect
     when /nick/i
       if connected?
-        irc_server.change_nick(msg.last)
+        irc_server.change_nick(msg.args.last)
       else
-        @nick = msg.last
+        @nick = msg.args.last
         check_connect
       end
     when /quit/i
       # DENIED
       close_connection
     when /ping/i
-      send_msg(":tkellem PONG tkellem :#{msg.last}")
+      send_msg(":tkellem PONG tkellem :#{msg.args.last}")
     else
       if !connected?
         close_connection

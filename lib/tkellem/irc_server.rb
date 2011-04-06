@@ -1,6 +1,6 @@
 require 'set'
 require 'eventmachine'
-require 'tkellem/irc_line'
+require 'tkellem/irc_message'
 require 'tkellem/bouncer_connection'
 require 'tkellem/backlog'
 
@@ -57,20 +57,20 @@ module IrcServer
 
   def receive_line(line)
     trace "from server: #{line}"
-    msg = IrcLine.parse(line)
+    msg = IrcMessage.parse(line)
 
     case msg.command
     when /0\d\d/, /2[56]\d/, /37[256]/
       welcomes << msg
       got_welcome if msg.command == "376" # end of MOTD
     when /join/i
-      debug "#{msg.target_user} joined #{msg.last}"
-      rooms << msg.last if msg.target_user == nick
+      debug "#{msg.target_user} joined #{msg.args.last}"
+      rooms << msg.args.last if msg.target_user == nick
     when /part/i
-      debug "#{msg.target_user} left #{msg.last}"
-      rooms.delete(msg.last) if msg.target_user == nick
+      debug "#{msg.target_user} left #{msg.args.last}"
+      rooms.delete(msg.args.last) if msg.target_user == nick
     when /ping/i
-      send_msg("PONG #{nick}!tkellem :#{msg.last}")
+      send_msg("PONG #{nick}!tkellem :#{msg.args.last}")
     when /pong/i
       # swallow it, we handle ping-pong from clients separately, in
       # BouncerConnection

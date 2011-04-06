@@ -1,6 +1,6 @@
 module Tkellem
 
-class IrcLine < Struct.new(:prefix, :command, :args, :ext_arg)
+class IrcMessage < Struct.new(:prefix, :command, :args)
   RE = %r{(:[^ ]+ )?([^ ]*)(.*)}i
 
   def self.parse(line)
@@ -9,17 +9,16 @@ class IrcLine < Struct.new(:prefix, :command, :args, :ext_arg)
     prefix = md[1] && md[1][1..-1].strip
     command = md[2]
     args = md[3]
-    ext_arg = nil
 
     args.strip!
     idx = args.index(":")
     if idx
-      args, ext_arg = args[0...idx].split(' '), args[idx+1..-1]
+      args = args[0...idx].split(' ') + [args[idx+1..-1]]
     else
       args = args.split(' ')
     end
 
-    self.new(prefix, command, args, ext_arg)
+    self.new(prefix, command, args)
   end
 
   def command?(cmd)
@@ -30,15 +29,12 @@ class IrcLine < Struct.new(:prefix, :command, :args, :ext_arg)
     line = []
     line << ":#{prefix}" unless prefix.nil?
     line << command
-    line += args
+    ext_arg = args.last if args.last.match(%r{\s})
+    line += ext_arg ? args[0...-1] : args
     line << ":#{ext_arg}" unless ext_arg.nil?
     line.join ' '
   end
   alias_method :to_s, :replay
-
-  def last
-    ext_arg || args.last
-  end
 
   def target_user
     if prefix && md = %r{^([^!]+)}.match(prefix)
@@ -49,8 +45,12 @@ class IrcLine < Struct.new(:prefix, :command, :args, :ext_arg)
   end
 
   def with_timestamp(timestamp)
-    new_ext_arg = ext_arg && "#{timestamp.strftime("%H:%M:%S")}> #{ext_arg}"
-    IrcLine.new(prefix, command, args, new_ext_arg)
+    args = self.args
+    if args && args[-1]
+      args = args.dup
+      args[-1] = "#{timestamp.strftime("%H:%M:%S")}> #{args[-1]}"
+    end
+    IrcMessage.new(prefix, command, args)
   end
 
 end

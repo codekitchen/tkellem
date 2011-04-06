@@ -1,4 +1,4 @@
-require 'tkellem/irc_line'
+require 'tkellem/irc_message'
 
 module Tkellem
 
@@ -9,7 +9,7 @@ module Tkellem
 
 class Backlog
 
-  class BacklogLine < Struct.new(:irc_line, :time)
+  class BacklogLine < Struct.new(:irc_message, :time)
   end
 
   def initialize(name, max_backlog = nil)
@@ -75,7 +75,7 @@ class Backlog
 
     until msgs.empty?
       backlog_line = msgs.shift
-      conn.send_msg(backlog_line.irc_line.with_timestamp(backlog_line.time))
+      conn.send_msg(backlog_line.irc_message.with_timestamp(backlog_line.time))
     end
   end
 end
