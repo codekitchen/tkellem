@@ -48,7 +48,8 @@ module BouncerConnection
   end
 
   def connect(conn_name, client_name, password)
-    @irc_server = bouncer.get_irc_server("#{conn_name.downcase}-#{@nick.downcase}").conn
+    server = bouncer.get_irc_server("#{conn_name.downcase}-#{@nick.downcase}")
+    @irc_server = server && server.conn
     unless irc_server && irc_server.connected?
       error!("unknown connection #{conn_name}-#{@nick}")
       return
