@@ -84,6 +84,8 @@ module IrcServerConnection
     @rooms = Set.new
     @active_conns = []
     @joined_rooms = false
+    # maps { bouncer_conn => away_status_or_nil }
+    @away = {}
   end
   attr_reader :name, :welcomes, :rooms, :nick, :active_conns
   alias_method :log_name, :name
@@ -142,6 +144,12 @@ module IrcServerConnection
 
     # We're all initialized, allow connections
     @connected = true
+    check_away_status
+  end
+
+  def got_away(bouncer_conn, msg)
+    @away[bouncer_conn] = msg.args.last
+    check_away_status
   end
 
   def change_nick(new_nick, force = false)
@@ -185,6 +193,8 @@ module IrcServerConnection
 
     active_conns << bouncer_conn
     @irc_server.backlogs[bouncer_conn.name].add_conn(bouncer_conn)
+    @away[bouncer_conn] = nil
+    check_away_status
     @irc_server.backlogs[bouncer_conn.name]
   end
 
@@ -192,7 +202,21 @@ module IrcServerConnection
     return nil unless @irc_server.backlogs[bouncer_conn.name]
 
     @irc_server.backlogs[bouncer_conn.name].remove_conn(bouncer_conn)
+    @away.delete(bouncer_conn)
+    check_away_status
     active_conns.delete(bouncer_conn)
+  end
+
+  def check_away_status
+    # for now we pretty much randomly pick an away status if multiple are set
+    # by clients
+    if @away.any? { |k,v| !v }
+      # we have a client who isn't away
+      send_msg("AWAY")
+    else
+      message = @away.values.first || "Away"
+      send_msg("AWAY :#{message}")
+    end
   end
 end
 

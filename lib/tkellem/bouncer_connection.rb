@@ -115,6 +115,8 @@ module BouncerConnection
       close_connection
     when /ping/i
       send_msg(":tkellem PONG tkellem :#{msg.args.last}")
+    when /away/i
+      irc_server.got_away(self, msg)
     else
       if !connected?
         close_connection
