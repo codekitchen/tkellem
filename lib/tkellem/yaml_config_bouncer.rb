@@ -65,7 +65,7 @@ class YamlConfigBouncer
       next unless user && network
       EasyLogger.logger.info("adding new connection #{bc['network']} for #{bc['user']}")
 
-      server = @bouncer.add_irc_server(bc['network'],
+      server = @bouncer.add_irc_server("#{bc['network']}-#{bc['user']}",
                                        network['host'], network['port'],
                                        network['ssl'],
                                        bc['nick'] || bc['user'])

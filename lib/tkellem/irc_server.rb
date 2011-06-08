@@ -6,37 +6,90 @@ require 'tkellem/backlog'
 
 module Tkellem
 
-module IrcServer
-  include EM::Protocols::LineText2
-  include Tkellem::EasyLogger
+class IrcServer
+  attr_reader :rooms, :backlogs, :conn
 
-  def initialize(bouncer, name, do_ssl, nick)
-    set_delimiter "\r\n"
-
+  def initialize(bouncer, name, nick)
     @bouncer = bouncer
     @name = name
-    @ssl = do_ssl
     @nick = nick
+    @cur_host = -1
+    @hosts = []
 
     @max_backlog = nil
-    @connected = false
-    @welcomes = []
-    @rooms = Set.new
     @backlogs = {}
-    @active_conns = []
-    @joined_rooms = false
-    @pending_rooms = []
+    @rooms = []
   end
-  attr_reader :name, :backlogs, :welcomes, :rooms, :nick, :active_conns
-  alias_method :log_name, :name
 
   def connected?
-    @connected
+    @conn && @conn.connected?
+  end
+
+  def add_host(host, port, do_ssl)
+    @hosts << [host, port, do_ssl]
+    connect! if @hosts.length == 1
   end
 
   def set_max_backlog(max_backlog)
     @max_backlog = max_backlog
     backlogs.each { |name, backlog| backlog.max_backlog = max_backlog }
+  end
+
+  def join_room(room)
+    @rooms << room
+    @conn.join_room(room) if connected?
+  end
+
+  def add_client(name)
+    return if backlogs[name]
+    backlog = Backlog.new(name, @max_backlog)
+    backlogs[name] = backlog
+  end
+
+  def disconnected!
+    @conn = nil
+    connect!
+  end
+
+  protected
+
+  def connect!
+    span = @last_connect ? Time.now - @last_connect : 1000
+    if span < 5
+      EM.add_timer(5) { connect! }
+      return
+    end
+    @last_connect = Time.now
+    @cur_host += 1
+    @cur_host = @cur_host % @hosts.length
+    host = @hosts[@cur_host]
+    @conn = EM.connect(host[0], host[1], IrcServerConnection, self, @name, host[2], @nick)
+  end
+end
+
+module IrcServerConnection
+  include EM::Protocols::LineText2
+  include Tkellem::EasyLogger
+
+  def initialize(irc_server, name, do_ssl, nick)
+    set_delimiter "\r\n"
+
+    @irc_server = irc_server
+    @name = name
+    @ssl = do_ssl
+    @nick = nick
+
+    @connected = false
+    @welcomes = []
+    @rooms = Set.new
+    @active_conns = []
+    @joined_rooms = false
+  end
+  attr_reader :name, :welcomes, :rooms, :nick, :active_conns
+  alias_method :log_name, :name
+
+  def connected?
+    @connected
   end
 
   def post_init
@@ -77,16 +130,15 @@ module IrcServer
     else
     end
 
-    backlogs.each { |name, backlog| backlog.handle_message(msg) }
+    @irc_server.backlogs.each { |name, backlog| backlog.handle_message(msg) }
   end
 
   def got_welcome
     return if @joined_rooms
     @joined_rooms = true
-    @pending_rooms.each do |room|
+    @irc_server.rooms.each do |room|
       join_room(room)
     end
-    @pending_rooms.clear
 
     # We're all initialized, allow connections
     @connected = true
@@ -99,24 +151,14 @@ module IrcServer
   end
 
   def join_room(room_name)
-    if @joined_rooms
-      send_msg("JOIN #{room_name}")
-    else
-      @pending_rooms << room_name
-    end
-  end
-
-  def add_client(name)
-    return if backlogs[name]
-    backlog = Backlog.new(name, @max_backlog)
-    backlogs[name] = backlog
+    send_msg("JOIN #{room_name}")
   end
 
   def remove_client(name)
-    backlog = backlogs.delete(name)
+    backlog = @irc_server.backlogs[name]
     if backlog
       backlog.active_conns.each do |conn|
-        conn.error!("client removed")
+        conn.error!("client disconnected")
       end
     end
   end
@@ -134,21 +176,22 @@ module IrcServer
     debug "OMG we got disconnected."
     # TODO: reconnect if desired. but not if this server was explicitly shut
     # down or removed.
-    backlogs.keys.each { |name| remove_client(name) }
+    @irc_server.backlogs.keys.each { |name| remove_client(name) }
+    @irc_server.disconnected!
   end
 
   def bouncer_connect(bouncer_conn)
-    return nil unless backlogs[bouncer_conn.name]
+    return nil unless @irc_server.backlogs[bouncer_conn.name]
 
     active_conns << bouncer_conn
-    backlogs[bouncer_conn.name].add_conn(bouncer_conn)
-    backlogs[bouncer_conn.name]
+    @irc_server.backlogs[bouncer_conn.name].add_conn(bouncer_conn)
+    @irc_server.backlogs[bouncer_conn.name]
   end
 
   def bouncer_disconnect(bouncer_conn)
-    return nil unless backlogs[bouncer_conn.name]
+    return nil unless @irc_server.backlogs[bouncer_conn.name]
 
-    backlogs[bouncer_conn.name].remove_conn(bouncer_conn)
+    @irc_server.backlogs[bouncer_conn.name].remove_conn(bouncer_conn)
     active_conns.delete(bouncer_conn)
   end
 end

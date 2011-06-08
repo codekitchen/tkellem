@@ -4,6 +4,7 @@ require 'tkellem/irc_server'
 
 module Tkellem
   class Bouncer
+    attr_reader :irc_servers
     def initialize
       @irc_servers = {}
       @listeners = {}
@@ -24,7 +25,8 @@ module Tkellem
 
     def add_irc_server(name, host, port, do_ssl, nick)
       raise("server already exists: #{name}") if @irc_servers[name]
-      server = EM.connect(host, port, IrcServer, self, name, do_ssl, nick)
+      server = IrcServer.new(self, name, nick)
+      server.add_host(host, port, do_ssl)
       @irc_servers[name] = server
       server.set_max_backlog(@max_backlog) if @max_backlog
       server
