@@ -29,7 +29,7 @@ class IrcMessage < Struct.new(:prefix, :command, :args)
     line = []
     line << ":#{prefix}" unless prefix.nil?
     line << command
-    ext_arg = args.last if args.last.match(%r{\s})
+    ext_arg = args.last if args.last && args.last.match(%r{\s})
     line += ext_arg ? args[0...-1] : args
     line << ":#{ext_arg}" unless ext_arg.nil?
     line.join ' '
