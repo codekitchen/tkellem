@@ -13,6 +13,14 @@ describe IrcMessage, ".parse" do
     line.args.should == ['first', 'second', 'long arg here']
     line.replay.should == orig
   end
+
+  it "should parse messages with embedded colons" do
+    orig = "MSG #myroom http://google.com/"
+    line = IrcMessage.parse(orig)
+    line.command.should == "MSG"
+    line.args.should == ["#myroom", "http://google.com/"]
+    line.replay.should == orig
+  end
 end
 
 describe IrcMessage, "#with_timestamp" do

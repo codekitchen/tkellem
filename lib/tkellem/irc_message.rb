@@ -12,7 +12,7 @@ class IrcMessage < Struct.new(:prefix, :command, :args)
 
     args.strip!
     idx = args.index(":")
-    if idx
+    if idx && (idx == 0 || args[idx-1] == " "[0])
       args = args[0...idx].split(' ') + [args[idx+1..-1]]
     else
       args = args.split(' ')
