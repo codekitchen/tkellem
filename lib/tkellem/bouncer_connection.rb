@@ -1,7 +1,5 @@
 require 'eventmachine'
 require 'tkellem/irc_message'
-require 'tkellem/backlog'
-require 'tkellem/push_service'
 
 module Tkellem
 
@@ -9,37 +7,36 @@ module BouncerConnection
   include EM::Protocols::LineText2
   include Tkellem::EasyLogger
 
-  def initialize(bouncer, do_ssl)
+  def initialize(tkellem_server, do_ssl)
     set_delimiter "\r\n"
 
     @ssl = do_ssl
-    @bouncer = bouncer
+    @tkellem = tkellem_server
 
-    @irc_server = nil
-    @backlog = nil
-    @nick = nil
-    @conn_name = nil
-    @name = nil
+    @state = :auth
+    @name = 'new-conn'
+    @data = {}
   end
-  attr_reader :ssl, :irc_server, :backlog, :bouncer, :nick
+  attr_reader :ssl, :bouncer, :name
+  alias_method :log_name, :name
 
-  def connected?
-    !!irc_server
+  def nick
+    @bouncer ? @bouncer.nick : @nick
   end
 
-  def name
-    @name || "new-conn"
+  def data(key)
+    @data[key] ||= {}
   end
 
   def post_init
     if ssl
-      debug "starting TLS"
       start_tls :verify_peer => false
+    else
+      ssl_handshake_completed
     end
   end
 
   def ssl_handshake_completed
-    debug "TLS complete"
   end
 
   def error!(msg)
@@ -48,128 +45,114 @@ module BouncerConnection
     close_connection(true)
   end
 
-  def connect(conn_name, client_name, password)
-    @irc_server = bouncer.get_irc_server("#{conn_name.downcase}-#{@user.downcase}")
-    unless irc_server && irc_server.connected?
-      error!("unknown connection #{conn_name}-#{@user}")
-      return
-    end
-
-    unless bouncer.do_auth(@nick, @password, irc_server)
-      error!("bad auth, please check your password")
-      @irc_server = @conn_name = @name = @backlog = nil
-      return
-    end
-
-    @conn_name = conn_name
-    @name = client_name
-    @backlog = irc_server.bouncer_connect(self)
-    unless backlog
-      error!("unknown client #{client_name}")
-      @irc_server = @conn_name = @name = nil
-      return
-    end
-
+  def connect_to_irc_server
+    @bouncer = @tkellem.find_bouncer(@user, @conn_name)
+    return error!("Unknown connection: #{@conn_name}") unless @bouncer
+    @state = :connected
     info "connected"
-
-    irc_server.send_welcome(self)
-    backlog.send_backlog(self)
-    irc_server.rooms.each { |room| simulate_join(room) }
+    @bouncer.connect_client(self, @device_name)
   end
 
-  def check_connect
-    if @conn_name && @nick
-      connect(@conn_name, @client_name, @password)
-    end
-  end
-
-  def tkellem(msg)
+  def msg_tkellem(msg)
     case msg.args.first
     when /nothing_yet/i
     else
-      send_msg(":tkellem!tkellem@tkellem PRIVMSG #{nick} :Unknown tkellem command #{msg.args.first}")
+      say_as_tkellem("Unknown tkellem command #{msg.args.first}")
     end
+  end
+
+  def say_as_tkellem(message)
+    send_msg(":-tkellem!~tkellem@tkellem PRIVMSG #{nick} :#{message}")
   end
 
   def receive_line(line)
     trace "from client: #{line}"
     msg = IrcMessage.parse(line)
-    case msg.command
-    when /tkellem/i
-      tkellem(msg)
-    when /pass/i
-      @password = msg.args.first
-    when /user/i
-      @user = msg.args.first
-      @conn_name, @client_name = msg.args.last.strip.split(' ').map { |a| a.downcase }
-      check_connect
-    when /nick/i
-      if connected?
-        irc_server.change_nick(msg.args.last)
-      else
-        @nick = msg.args.last
-        check_connect
-      end
-    when /quit/i
-      # DENIED
-      close_connection
-    when /ping/i
-      send_msg(":tkellem PONG tkellem :#{msg.args.last}")
-    when /away/i
-      irc_server.got_away(self, msg) if connected?
-    when /cap/i
+
+    command = msg.command
+    if command == 'PRIVMSG' && msg.args.first == '-tkellem'
+      msg_tkellem(IrcMessage.new(nil, 'TKELLEM', msg.args[1..-1]))
+    elsif command == 'CAP'
+      # TODO: full support for CAP -- this just gets mobile colloquy connecting
       if msg.args.first =~ /req/i
         send_msg("CAP NAK")
       end
-    when /push/i
-      if connected? # TODO: check for colloquy enabled
-        if @push_service
-          @push_service.client_message(msg)
-        else
-          @push_service = irc_server.got_push(self, msg)
-        end
+    elsif command == 'PASS'
+      unless @password
+        @password = msg.args.first
       end
+    elsif command == 'NICK' && @state == :auth
+      @nick = msg.args.first
+    elsif command == 'QUIT'
+      close_connection
+    elsif command == 'USER'
+      msg_user(msg)
+    elsif @state == :auth
+      error!("Protocol error. You must authenticate first.")
+    elsif @state == :connected
+      @bouncer.client_msg(self, msg)
     else
-      if !connected?
-        close_connection
+      say_as_tkellem("You must connect to an irc network to do that.")
+    end
+
+  rescue => e
+    error "Error handling message: {#{msg}} #{e}"
+    e.backtrace.each { |l| error l }
+    begin
+      error! "Internal Tkellem error."
+    rescue
+    end
+  end
+
+  def msg_user(msg)
+    unless @user
+      @username, rest = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
+      @name = @username
+      @user = User.authenticate(@username, @password)
+      return error!("Unknown username: #{@username} or bad password.") unless @user
+
+      if rest && !rest.empty?
+        @conn_name, @device_name = rest.split(':', 2)
+        @device_name = nil if @device_name && @device_name.empty?
+        @name = "#{@username}-#{@conn_name}"
+        @name += "-#{@device_name}" if @device_name
+        connect_to_irc_server
       else
-        # pay it forward
-        irc_server.send_msg(msg)
+        @name = "#{@username}-console"
+        connect_to_tkellem_console
       end
     end
   end
 
-  def stop_push_service
-    @push_service = nil
+  def connect_to_tkellem_console
+    send_msg(":tkellem 001 #{nick} :Welcome to the Tkellem admin console")
+    send_msg(":tkellem 376 #{nick} :End")
+    @state = :console
   end
 
   def simulate_join(room)
-    send_msg(":#{irc_server.nick}!#{name}@tkellem JOIN #{room}")
+    send_msg(":#{nick}!#{name}@tkellem JOIN #{room}")
     # TODO: intercept the NAMES response so that only this bouncer gets it
     # Otherwise other clients might show an "in this room" line.
-    irc_server.send_msg("NAMES #{room}\r\n")
+    @bouncer.send_msg("NAMES #{room}\r\n")
   end
 
-  def transient_response(msg)
-    send_msg(msg)
-    if msg.command == "366"
-      # finished joining this room, let's backlog it
-      debug "got final NAMES for #{msg.args[1]}, sending backlog"
-      backlog.send_backlog(self, msg.args[1])
-    end
-  end
+  # def transient_response(msg)
+  #   send_msg(msg)
+  #   if msg.command == "366"
+  #     # finished joining this room, let's backlog it
+  #     debug "got final NAMES for #{msg.args[1]}, sending backlog"
+  #     # backlog.send_backlog(self, msg.args[1])
+  #   end
+  # end
 
   def send_msg(msg)
     trace "to client: #{msg}"
     send_data("#{msg}\r\n")
   end
 
-  def log_name
-    "#{@conn_name}-#{name}"
-  end
-
   def unbind
-    irc_server.bouncer_disconnect(self) if connected?
+    @bouncer.disconnect_client(self) if @bouncer
   end
 end
 

@@ -7,7 +7,7 @@ class IrcMessage < Struct.new(:prefix, :command, :args)
     md = RE.match(line) or raise("invalid input: #{line.inspect}")
 
     prefix = md[1] && md[1][1..-1].strip
-    command = md[2]
+    command = md[2].upcase
     args = md[3]
 
     args.strip!

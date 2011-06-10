@@ -14,17 +14,45 @@ class PushService
     @connections || @connections = {}
   end
 
+  def self.active_instances
+    # TODO: need to time these out after some period -- a week or something
+    @instances || @instances = {}
+  end
+
+  def self.client_msg(bouncer, client, msg)
+    # TODO: check if push services enabled
+    raise("only push plz") unless msg.command == 'PUSH'
+    if service = client.data(self)[:instance]
+      service.client_message(msg)
+    elsif msg.args.first != 'add-device'
+      # TODO: return error to client?
+    else
+      service = PushService.new(bouncer, msg)
+      # This will replace the old one for the same device, if it exists
+      active_instances[service.device_token] = service
+      client.data(self)[:instance] = service
+    end
+  end
+
+  def self.server_msg(msg)
+    active_instances.each { |token, service| service.handle_message(msg) }
+  end
+
+  def self.stop_service(push_service)
+    active_instances.delete(push_service.device_token)
+  end
+
   def log_name
     "#{@bouncer.log_name}:#{@device_token}"
   end
 
-  def initialize(bouncer_connection, add_device_msg)
-    @bouncer = bouncer_connection
+  def initialize(bouncer, add_device_msg)
+    @bouncer = bouncer
     @device_token, @device_name = add_device_msg.args[1,2]
   end
 
   def client_message(msg)
-    raise("only push plz") unless msg.command.downcase == 'push'
+    raise("only push plz") unless msg.command == 'PUSH'
     case msg.args.first
     when 'add-device'
       # shouldn't get this again
@@ -41,7 +69,7 @@ class PushService
       @message_sound = msg.args.last
     when 'end-device'
     when 'remove-device'
-      @bouncer.stop_push_service
+      self.class.stop_service(self)
     end
   end
 

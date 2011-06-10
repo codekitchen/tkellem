@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+EM.run do
+  server = Tkellem::TkellemServer.new
+end

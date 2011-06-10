@@ -19,6 +19,10 @@ module Tkellem
       @trace || @trace = true
     end
 
+    def log_name
+      ""
+    end
+
     def trace(msg)
       puts("TRACE: #{log_name}: #{msg}") if EasyLogger.trace
     end
@@ -35,4 +39,4 @@ module Tkellem
 end
 
 require "tkellem/version"
-require 'tkellem/bouncer'
+require 'tkellem/tkellem_server'

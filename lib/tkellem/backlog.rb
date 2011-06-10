@@ -12,27 +12,26 @@ class Backlog
   class BacklogLine < Struct.new(:irc_message, :time)
   end
 
-  def initialize(name, max_backlog = nil)
-    @name = name
+  def initialize
     @backlog = []
     @pm_backlogs = Hash.new { |h,k| h[k] = [] }
     @active_conns = []
-    @max_backlog = max_backlog
   end
-  attr_reader :name, :backlog, :active_conns, :pm_backlogs, :max_backlog
+  attr_reader :backlog, :active_conns, :pm_backlogs
 
   def handle_message(msg)
     # TODO: only send back response messages like WHO, NAMES, etc. to the
     # BouncerConnection that requested it.
-    if !active_conns.empty?
-      case msg.command
-      when /3\d\d/, /join/i, /part/i
-        # transient response -- we want to forward these, but not backlog
-        active_conns.each { |conn| conn.transient_response(msg) }
-      else
-        active_conns.each { |conn| conn.send_msg(msg) }
-      end
-    elsif msg.command.match(/privmsg/i)
+    # if !active_conns.empty?
+    #   case msg.command
+    #   when /3\d\d/, /join/i, /part/i
+    #     # transient response -- we want to forward these, but not backlog
+    #     active_conns.each { |conn| conn.transient_response(msg) }
+    #   else
+    #     active_conns.each { |conn| conn.send_msg(msg) }
+    #   end
+    # elsif
+    if msg.command.match(/privmsg/i)
       if msg.args.first.match(/^#/)
         # room privmsg always goes in a specific backlog
         pm_target = msg.args.first
@@ -42,26 +41,26 @@ class Backlog
         bl = backlog
       end
       bl.push(BacklogLine.new(msg, Time.now))
-      limit_backlog(bl)
+      # limit_backlog(bl)
     end
   end
 
-  def limit_backlog(bl)
-    bl.shift until !max_backlog || bl.size <= max_backlog
+  # def limit_backlog(bl)
+  #   bl.shift until !max_backlog || bl.size <= max_backlog
+  # end
+
+  # def max_backlog=(new_val)
+  #   @max_backlog = new_val
+  #   limit_backlog(backlog)
+  #   pm_backlogs.each { |k,bl| limit_backlog(bl) }
+  # end
+
+  def add_client(client, device_name)
+    active_conns << client
   end
 
-  def max_backlog=(new_val)
-    @max_backlog = new_val
-    limit_backlog(backlog)
-    pm_backlogs.each { |k,bl| limit_backlog(bl) }
-  end
-
-  def add_conn(bouncer_conn)
-    active_conns << bouncer_conn
-  end
-
-  def remove_conn(bouncer_conn)
-    active_conns.delete(bouncer_conn)
+  def remove_client(client)
+    active_conns.delete(client)
   end
 
   def send_backlog(conn, pm_target = nil)
