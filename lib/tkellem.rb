@@ -18,7 +18,7 @@ module Tkellem
       @trace = val
     end
     def self.trace
-      @trace || @trace = false
+      @trace || @trace = true
     end
 
     def trace(msg)

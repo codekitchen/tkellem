@@ -1,6 +1,7 @@
 require 'eventmachine'
 require 'tkellem/irc_message'
 require 'tkellem/backlog'
+require 'tkellem/push_service'
 
 module Tkellem
 
@@ -48,8 +49,7 @@ module BouncerConnection
   end
 
   def connect(conn_name, client_name, password)
-    server = bouncer.get_irc_server("#{conn_name.downcase}-#{@user.downcase}")
-    @irc_server = server && server.conn
+    @irc_server = bouncer.get_irc_server("#{conn_name.downcase}-#{@user.downcase}")
     unless irc_server && irc_server.connected?
       error!("unknown connection #{conn_name}-#{@user}")
       return
@@ -101,7 +101,7 @@ module BouncerConnection
       @password = msg.args.first
     when /user/i
       @user = msg.args.first
-      @conn_name, @client_name = msg.args.last.strip.split(' ')
+      @conn_name, @client_name = msg.args.last.strip.split(' ').map { |a| a.downcase }
       check_connect
     when /nick/i
       if connected?
@@ -116,7 +116,19 @@ module BouncerConnection
     when /ping/i
       send_msg(":tkellem PONG tkellem :#{msg.args.last}")
     when /away/i
-      irc_server.got_away(self, msg)
+      irc_server.got_away(self, msg) if connected?
+    when /cap/i
+      if msg.args.first =~ /req/i
+        send_msg("CAP NAK")
+      end
+    when /push/i
+      if connected? # TODO: check for colloquy enabled
+        if @push_service
+          @push_service.client_message(msg)
+        else
+          @push_service = irc_server.got_push(self, msg)
+        end
+      end
     else
       if !connected?
         close_connection
@@ -125,6 +137,10 @@ module BouncerConnection
         irc_server.send_msg(msg)
       end
     end
+  end
+
+  def stop_push_service
+    @push_service = nil
   end
 
   def simulate_join(room)
