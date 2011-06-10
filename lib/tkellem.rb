@@ -1,6 +1,4 @@
 module Tkellem
-  VERSION = "0.7.2"
-
   module EasyLogger
     require 'logger'
 
@@ -36,4 +34,5 @@ module Tkellem
   end
 end
 
+require "tkellem/version"
 require 'tkellem/bouncer'
