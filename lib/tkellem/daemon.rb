@@ -2,6 +2,7 @@ require 'fileutils'
 require 'optparse'
 
 require 'tkellem'
+require 'tkellem/socket_server'
 
 class Tkellem::Daemon
   attr_reader :options
@@ -22,6 +23,7 @@ class Tkellem::Daemon
   run        start and run in the foreground
   restart    stop and then start the jobs daemon
   status     show daemon status
+  admin      run admin commands as if connected to the tkellem console
 }
 
       opts.separator "\n<options>"
@@ -30,6 +32,7 @@ class Tkellem::Daemon
     end.parse!(@args)
 
     FileUtils.mkdir_p(path)
+    File.chmod(0700, path)
     command = @args.shift
     case command
     when 'start'
@@ -49,6 +52,8 @@ class Tkellem::Daemon
       end
       daemonize
       start
+    when 'admin'
+      admin
     else
       raise("Unknown command: #{command.inspect}")
     end
@@ -56,11 +61,39 @@ class Tkellem::Daemon
 
   protected
 
+  def admin
+    require 'socket'
+    socket = UNIXSocket.new(socket_file)
+    line = @args.join(' ').strip
+    if line.empty?
+      require 'readline'
+      while line = Readline.readline('> ', true)
+        admin_command(line, socket)
+      end
+    else
+      admin_command(line, socket)
+    end
+  end
+
+  def admin_command(line, socket)
+    socket.puts(line)
+    loop do
+     line = socket.readline.chomp
+     puts line
+     if line.empty?
+       break
+     end
+    end
+  end
+
   def start
     trap("INT") { EM.stop }
-    EM.run { Tkellem::TkellemServer.new }
+    EM.run do
+      @admin = EM.start_unix_domain_server(socket_file, Tkellem::SocketServer)
+      Tkellem::TkellemServer.new
+    end
   ensure
-    remove_pid_file
+    remove_files
   end
 
   def daemonize
@@ -98,7 +131,8 @@ class Tkellem::Daemon
     pid.to_i > 0 ? pid.to_i : nil
   end
 
-  def remove_pid_file
+  def remove_files
+    FileUtils.rm(socket_file)
     return unless @daemon
     pid = File.read(pid_file) if File.file?(pid_file)
     if pid.to_i == Process.pid
@@ -112,6 +146,10 @@ class Tkellem::Daemon
 
   def pid_file
     File.join(path, 'tkellem.pid')
+  end
+
+  def socket_file
+    File.join(path, 'tkellem.socket')
   end
 
 end

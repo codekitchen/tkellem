@@ -19,7 +19,7 @@ class TkellemServer
   include Tkellem::EasyLogger
 
   def initialize
-    @listeners = []
+    @listeners = {}
     @bouncers = {}
 
     ActiveRecord::Base.establish_connection({
@@ -30,6 +30,22 @@ class TkellemServer
 
     ListenAddress.all.each { |a| listen(a) }
     NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }
+    Observer.forward_to << self
+  end
+
+  # callback for AR observer events
+  def after_create(obj)
+    case obj
+    when ListenAddress
+      listen(obj)
+    end
+  end
+
+  def after_destroy(obj)
+    case obj
+    when ListenAddress
+      stop_listening(obj)
+    end
   end
 
   def listen(listen_address)
@@ -37,13 +53,20 @@ class TkellemServer
     port = listen_address.port
     ssl = listen_address.ssl
 
-    info "Listening on #{address}:#{port} (ssl=#{!!ssl.inspect})"
+    info "Listening on #{listen_address}"
 
-    @listeners << EM.start_server(listen_address.address,
-                                  listen_address.port,
-                                  BouncerConnection,
-                                  self,
-                                  listen_address.ssl)
+    @listeners[listen_address.id] = EM.start_server(listen_address.address,
+                                                    listen_address.port,
+                                                    BouncerConnection,
+                                                    self,
+                                                    listen_address.ssl)
+  end
+
+  def stop_listening(listen_address)
+    listener = @listeners[listen_address.id]
+    return unless listener
+    EM.stop_server(listener)
+    info "No longer listening on #{listen_address}"
   end
 
   def add_bouncer(bouncer)
@@ -56,6 +79,23 @@ class TkellemServer
     key = [user.id, network_name]
     @bouncers[key]
   end
+
+  class Observer < ActiveRecord::Observer
+    observe 'Tkellem::ListenAddress'
+    cattr_accessor :forward_to
+    self.forward_to = []
+
+    def after_create(obj)
+      forward_to.each { |f| f.after_create(obj) }
+    end
+
+    def after_destroy(obj)
+      forward_to.each { |f| f.after_destroy(obj) }
+    end
+  end
+
+  ActiveRecord::Base.observers = Observer
+  ActiveRecord::Base.instantiate_observers
 end
 
 end
