@@ -18,7 +18,7 @@ module Tkellem
 class TkellemServer
   include Tkellem::EasyLogger
 
-  def initialize(config)
+  def initialize
     @listeners = []
     @bouncers = {}
 

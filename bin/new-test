@@ -1,10 +1,7 @@
 #!/usr/bin/env ruby
 
-require 'yaml'
 require 'tkellem'
 
-config = YAML.load_file(File.expand_path("~/.tkellem/config.yml"))
-
 EM.run do
-  server = Tkellem::TkellemServer.new(config)
+  server = Tkellem::TkellemServer.new
 end
