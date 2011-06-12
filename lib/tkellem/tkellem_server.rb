@@ -33,7 +33,7 @@ class TkellemServer
     Observer.forward_to << self
   end
 
-  # callback for AR observer events
+  # callbacks for AR observer events
   def after_create(obj)
     case obj
     when ListenAddress

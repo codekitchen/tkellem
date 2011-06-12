@@ -91,6 +91,10 @@ class Backlog
       return
     when 'PRIVMSG'
       ctx = msg.args.first
+      if ctx == @bouncer.nick
+        # incoming pm, fake ctx to be the sender's nick
+        ctx = msg.prefix.split(/[!~@]/, 2).first
+      end
       stream = get_stream(ctx)
       stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S < #{msg.prefix}: #{msg.args.last}"))
       update_pos(ctx, stream.pos)
@@ -119,7 +123,17 @@ class Backlog
           # to user
         else
           # from user, add prefix
-          msg.prefix = @bouncer.nick
+          if msg.args.first[0] == '#'[0]
+            # it's a room, we can just replay
+            msg.prefix = @bouncer.nick
+          else
+            # a one-on-one chat -- every client i've seen doesn't know how to
+            # display messages from themselves here, so we fake it by just
+            # adding an arrow and pretending the other user said it. shame.
+            msg.prefix = msg.args.first
+            msg.args[0] = @bouncer.nick
+            msg.args[-1] = "-> #{msg.args.last}"
+          end
         end
         conn.send_msg(msg.with_timestamp(timestamp))
       end

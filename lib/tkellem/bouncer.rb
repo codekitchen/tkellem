@@ -75,7 +75,7 @@ class Bouncer
       client.send_msg(":tkellem!tkellem PONG tkellem :#{msg.args.last}")
       false
     when 'AWAY'
-      @away[bouncer_conn] = msg.args.last
+      @away[client] = msg.args.last
       check_away_status
       false
     else
