@@ -7,6 +7,8 @@ require 'tkellem/models/network'
 require 'tkellem/models/network_user'
 require 'tkellem/models/listen_address'
 
+require 'tkellem/plugins/push_service'
+
 module Tkellem
 class TkellemServer
   include Tkellem::EasyLogger

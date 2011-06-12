@@ -1,6 +1,7 @@
+require 'active_support/core_ext/class/attribute_accessors'
+
 require 'tkellem/irc_server'
 require 'tkellem/bouncer_connection'
-require 'tkellem/push_service'
 
 module Tkellem
 
@@ -8,6 +9,8 @@ class Bouncer
   include Tkellem::EasyLogger
 
   attr_reader :user, :network, :nick
+  cattr_accessor :plugins
+  self.plugins = []
 
   def initialize(network_user)
     @network_user = network_user
@@ -25,6 +28,10 @@ class Bouncer
 
     @hosts = network_user.network.hosts.map { |h| h }
     connect!
+  end
+
+  def self.add_plugin(plugin)
+    self.plugins << plugin
   end
 
   def connected?
@@ -53,6 +60,10 @@ class Bouncer
   end
 
   def client_msg(client, msg)
+    return if plugins.any? do |plugin|
+      !plugin.client_msg(self, client, msg)
+    end
+
     forward = case msg.command
     when 'PING'
       client.send_msg(":tkellem!tkellem PONG tkellem :#{msg.args.last}")
@@ -60,9 +71,6 @@ class Bouncer
     when 'AWAY'
       @away[bouncer_conn] = msg.args.last
       check_away_status
-      false
-    when 'PUSH'
-      PushService.client_msg(self, client, msg)
       false
     else
       true
@@ -75,6 +83,10 @@ class Bouncer
   end
 
   def server_msg(msg)
+    return if plugins.any? do |plugin|
+      !plugin.server_msg(self, msg)
+    end
+
     forward = case msg.command
     when /0\d\d/, /2[56]\d/, /37[256]/
       @welcomes << msg
@@ -105,7 +117,6 @@ class Bouncer
       # store to backlog
       @backlog.handle_message(msg)
     end
-    PushService.server_msg(msg)
   end
 
   ## Away Statuses
