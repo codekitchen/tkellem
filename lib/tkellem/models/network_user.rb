@@ -1,5 +1,12 @@
-class NetworkUser < Struct.new(:user, :network)
+module Tkellem
+
+class NetworkUser < ActiveRecord::Base
+  belongs_to :network
+  belongs_to :user
+
   def nick
-    user.name
+    read_attribute(:nick) || user.name
   end
+end
+
 end

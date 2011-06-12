@@ -1,19 +1,19 @@
-class User < Struct.new(:name)
-  def initialize(*a)
-    super
-    @@users ||= []
-    @@users << self
-  end
+module Tkellem
 
+class User < ActiveRecord::Base
   def self.authenticate(username, password)
-    if password == 'asdf'
-      @@users.find { |u| u.name == username }
-    else
-      nil
-    end
+    user = find_by_username(username)
+    user && user.valid_password?(password) && user
   end
 
-  def id
-    name
+  def name
+    username
   end
+
+  def valid_password?(password)
+    require 'openssl'
+    self.password == OpenSSL::Digest::SHA1.hexdigest(password)
+  end
+end
+
 end

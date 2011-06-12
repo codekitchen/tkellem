@@ -1,12 +1,7 @@
-class Network < Struct.new(:a)
-  def name
-    "localhost"
-  end
+module Tkellem
 
-  class Host < Struct.new(:address, :port, :ssl)
-  end
+class Network < ActiveRecord::Base
+  has_many :hosts, :class_name => 'Tkellem::Host'
+end
 
-  def hosts
-    [Host.new('localhost', 8765, false)]
-  end
 end

@@ -1,7 +1,6 @@
-class ListenAddress < Struct.new(:address, :port, :ssl)
+module Tkellem
 
-  def self.all
-    [self.new('0.0.0.0', 10001, true)]
-  end
+class ListenAddress < ActiveRecord::Base
+end
 
 end
