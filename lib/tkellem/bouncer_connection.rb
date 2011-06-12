@@ -1,3 +1,5 @@
+require 'active_support/core_ext/object/blank'
+
 require 'eventmachine'
 require 'tkellem/irc_message'
 
@@ -17,7 +19,7 @@ module BouncerConnection
     @name = 'new-conn'
     @data = {}
   end
-  attr_reader :ssl, :bouncer, :name
+  attr_reader :ssl, :bouncer, :name, :device_name
   alias_method :log_name, :name
 
   def nick
@@ -50,7 +52,7 @@ module BouncerConnection
     return error!("Unknown connection: #{@conn_name}") unless @bouncer
     @state = :connected
     info "connected"
-    @bouncer.connect_client(self, @device_name)
+    @bouncer.connect_client(self)
   end
 
   def msg_tkellem(msg)
@@ -113,7 +115,9 @@ module BouncerConnection
 
       if rest && !rest.empty?
         @conn_name, @device_name = rest.split(':', 2)
-        @device_name = nil if @device_name && @device_name.empty?
+        # 'default' or missing device_name to use the default backlog
+        # pass a device_name to have device-independent backlogs
+        @device_name = @device_name.presence || 'default'
         @name = "#{@username}-#{@conn_name}"
         @name += "-#{@device_name}" if @device_name
         connect_to_irc_server
@@ -136,15 +140,6 @@ module BouncerConnection
     # Otherwise other clients might show an "in this room" line.
     @bouncer.send_msg("NAMES #{room}\r\n")
   end
-
-  # def transient_response(msg)
-  #   send_msg(msg)
-  #   if msg.command == "366"
-  #     # finished joining this room, let's backlog it
-  #     debug "got final NAMES for #{msg.args[1]}, sending backlog"
-  #     # backlog.send_backlog(self, msg.args[1])
-  #   end
-  # end
 
   def send_msg(msg)
     trace "to client: #{msg}"

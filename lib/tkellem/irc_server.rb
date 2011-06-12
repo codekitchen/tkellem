@@ -2,7 +2,6 @@ require 'set'
 require 'eventmachine'
 require 'tkellem/irc_message'
 require 'tkellem/bouncer_connection'
-require 'tkellem/backlog'
 
 module Tkellem
 

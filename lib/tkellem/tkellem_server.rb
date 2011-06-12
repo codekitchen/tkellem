@@ -8,6 +8,7 @@ require 'tkellem/models/network_user'
 require 'tkellem/models/listen_address'
 
 require 'tkellem/plugins/push_service'
+require 'tkellem/plugins/backlog'
 
 module Tkellem
 class TkellemServer

@@ -20,14 +20,23 @@ class Bouncer
     @nick = network_user.nick
     # maps { client_conn => state_hash }
     @active_conns = {}
-    @backlog = Backlog.new
     @welcomes = []
     @rooms = ['#tk']
     # maps { client_conn => away_status_or_nil }
     @away = {}
+    # plugin data
+    @data = {}
 
     @hosts = network_user.network.hosts.map { |h| h }
     connect!
+  end
+
+  def data(key)
+    @data[key] ||= {}
+  end
+
+  def active_conns
+    @active_conns.keys
   end
 
   def self.add_plugin(plugin)
@@ -38,22 +47,19 @@ class Bouncer
     !!@connected
   end
 
-  # pass nil device_name to use the default backlog
-  # pass a device_name to have device-independent backlogs
-  def connect_client(client, device_name)
+  def connect_client(client)
     @active_conns[client] = {}
-    @backlog.add_client(client, device_name)
     @away[client] = nil
 
     send_welcome(client)
-    # send_backlog
+    # make the client join all the rooms that we're in
     @rooms.each { |room| client.simulate_join(room) }
 
+    plugins.each { |plugin| plugin.new_client_connected(self, client) }
     check_away_status
   end
 
   def disconnect_client(client)
-    @backlog.remove_client(client)
     @away.delete(client)
     check_away_status
     @active_conns.delete(client)
@@ -114,8 +120,6 @@ class Bouncer
     if forward
       # send to clients
       @active_conns.each { |c,s| c.send_msg(msg) }
-      # store to backlog
-      @backlog.handle_message(msg)
     end
   end
 

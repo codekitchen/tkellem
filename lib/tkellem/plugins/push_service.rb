@@ -21,6 +21,9 @@ class PushService
 
   Bouncer.add_plugin(self)
 
+  def self.new_client_connected(bouncer, client)
+  end
+
   def self.client_msg(bouncer, client, msg)
     # TODO: check if push services enabled
     case msg.command
