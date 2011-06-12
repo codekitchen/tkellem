@@ -1,40 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'yaml'
-require 'optparse'
+require 'tkellem/daemon'
 
-opts = OptionParser.new
-opts.banner = <<BANNER
-Usage: #{opts.program_name} PATH_TO_CONFIG
-
-Start a tkellem instance using the specified configuration file (or ~/.tkellem/config.yml if none given)
-BANNER
-
-daemonize = false
-
-opts.on_tail("-h", "--help") { puts opts; exit }
-opts.on('-d', '--daemonize') { daemonize = true }
-
-rest = opts.parse(ARGV)
-config_filename = rest.first || File.expand_path(ENV["HOME"]+'/.tkellem/config.yml')
-
-require 'tkellem/yaml_config_bouncer'
-
-config = YAML.load_file(config_filename)
-
-if daemonize
-  require 'daemons'
-  Daemons.daemonize(:log_output => true,
-                    :backtrace => true,
-                    :app_name => File.basename($0))
-end
-
-EM.run do
-  tkellem = Tkellem::YamlConfigBouncer.new(config)
-
-  Signal.trap('HUP') do
-    Tkellem::EasyLogger.logger.info("got HUP, reloading #{config_filename}")
-    new_config = YAML.load_file(config_filename)
-    tkellem.reload(new_config)
-  end
-end
+Tkellem::Daemon.new(ARGV).run()
