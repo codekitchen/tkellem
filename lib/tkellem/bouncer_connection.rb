@@ -56,10 +56,8 @@ module BouncerConnection
   end
 
   def msg_tkellem(msg)
-    case msg.args.first
-    when /nothing_yet/i
-    else
-      say_as_tkellem("Unknown tkellem command #{msg.args.first}")
+    TkellemBot.run_command(msg.args.join(' '), @user) do |response|
+      say_as_tkellem(response)
     end
   end
 
@@ -72,8 +70,10 @@ module BouncerConnection
     msg = IrcMessage.parse(line)
 
     command = msg.command
-    if command == 'PRIVMSG' && msg.args.first == '-tkellem'
-      msg_tkellem(IrcMessage.new(nil, 'TKELLEM', msg.args[1..-1]))
+    if @user && command == 'PRIVMSG' && msg.args.first == '-tkellem'
+      msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
+    elsif command == 'TKELLEM'
+      msg_tkellem(msg)
     elsif command == 'CAP'
       # TODO: full support for CAP -- this just gets mobile colloquy connecting
       if msg.args.first =~ /req/i

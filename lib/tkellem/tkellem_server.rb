@@ -38,6 +38,8 @@ class TkellemServer
     case obj
     when ListenAddress
       listen(obj)
+    when NetworkUser
+      add_bouncer(Bouncer.new(obj))
     end
   end
 
@@ -45,6 +47,7 @@ class TkellemServer
     case obj
     when ListenAddress
       stop_listening(obj)
+    # TODO: remove bouncer on NetworkUser.destroy
     end
   end
 
@@ -81,7 +84,7 @@ class TkellemServer
   end
 
   class Observer < ActiveRecord::Observer
-    observe 'Tkellem::ListenAddress'
+    observe 'Tkellem::ListenAddress', 'Tkellem::NetworkUser'
     cattr_accessor :forward_to
     self.forward_to = []
 

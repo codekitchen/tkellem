@@ -78,9 +78,9 @@ class Tkellem::Daemon
   def admin_command(line, socket)
     socket.puts(line)
     loop do
-     line = socket.readline.chomp
+     line = socket.readline("\n").chomp
      puts line
-     if line.empty?
+     if line == "\0"
        break
      end
     end

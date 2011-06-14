@@ -4,6 +4,7 @@ class User < ActiveRecord::Base
   has_many :network_users, :dependent => :destroy
   has_many :networks, :dependent => :destroy
 
+  validates_presence_of :username
   validates_uniqueness_of :username
   validates_presence_of :role, :in => %w(user admin)
 
@@ -29,6 +30,10 @@ class User < ActiveRecord::Base
     nil
   end
 
+  def username=(val)
+    write_attribute(:username, val.try(:downcase))
+  end
+
   def name
     username
   end
@@ -36,6 +41,11 @@ class User < ActiveRecord::Base
   def valid_password?(password)
     require 'openssl'
     self.password == OpenSSL::Digest::SHA1.hexdigest(password)
+  end
+
+  def set_password!(password)
+    self.password = OpenSSL::Digest::SHA1.hexdigest(password)
+    self.save!
   end
 
   def admin?

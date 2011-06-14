@@ -27,7 +27,6 @@ class Bouncer
     # plugin data
     @data = {}
 
-    @hosts = network_user.network.hosts.map { |h| h }
     connect!
   end
 
@@ -177,13 +176,15 @@ class Bouncer
 
   def connect!
     span = @last_connect ? Time.now - @last_connect : 1000
-    if span < 5
+    hosts = @network.hosts(true).map { |h| h }
+
+    if span < 5 || hosts.length < 1
       EM.add_timer(5) { connect! }
       return
     end
     @last_connect = Time.now
-    @cur_host = (@cur_host || 0) % @hosts.length
-    host = @hosts[@cur_host]
+    @cur_host = (@cur_host || 0) % hosts.length
+    host = hosts[@cur_host]
     @conn = EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
   end
 

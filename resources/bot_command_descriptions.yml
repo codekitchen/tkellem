@@ -1,0 +1,36 @@
+--- 
+LISTEN:
+  banner: "Usage: LISTEN [--add|--remove|--list] <uri>"
+  help: |+
+    Manage the address/port combinations for tkellem to accept client
+    connections on.
+
+    Protocol is either `irc`, or `ircs` for an SSL listener.
+
+    Example:
+        LISTEN --add ircs://0.0.0.0:10001
+
+USER:
+  banner: "Usage: USER [--add|--remove|--list] <username> [--admin]"
+  help: |+
+    Manage users.
+
+    Example:
+        USER --add joe admin
+
+PASSWORD:
+  banner: "Usage: PASSWORD [--user <username>] <new-password>"
+  help: |+
+    Change password. If you are an admin, you can change other users passwords as well.
+
+    Example:
+        PASSWORD hunter2
+
+NETWORK:
+  banner: "Usage: NETWORK [--add|--remove|--list] [--public] <network-name> <uri>"
+  help: |+
+    Manage networks. --add will add a new network, or a new connection host to an existing network. Public networks can only be created by admins, and can be joined by anybody.
+
+    Examples:
+        NETWORK --add --public freenode irc://irc.freenode.org:6667
+        NETWORK --add freenode ircs://irc.freenode.org:7000

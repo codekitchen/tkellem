@@ -5,7 +5,7 @@ class ListenAddress < ActiveRecord::Base
   validates_presence_of :address, :port
 
   def to_s
-    "#{address}:#{port} (ssl=#{!!ssl.inspect})"
+    "#{ssl ? 'ircs' : 'irc'}://#{address}:#{port}"
   end
 end
 
