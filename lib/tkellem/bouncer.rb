@@ -21,7 +21,7 @@ class Bouncer
     # maps { client_conn => state_hash }
     @active_conns = {}
     @welcomes = []
-    @rooms = ['#tk']
+    @rooms = []
     # maps { client_conn => away_status_or_nil }
     @away = {}
     # plugin data
