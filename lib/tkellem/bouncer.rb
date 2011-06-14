@@ -26,6 +26,8 @@ class Bouncer
     @away = {}
     # plugin data
     @data = {}
+    # clients waiting for us to connect to the irc server
+    @waiting_clients = []
 
     connect!
   end
@@ -49,6 +51,12 @@ class Bouncer
   def connect_client(client)
     @active_conns[client] = {}
     @away[client] = nil
+
+    if !connected?
+      @waiting_clients << client
+      client.say_as_tkellem("Connecting you to the IRC server. Please wait...")
+      return
+    end
 
     send_welcome(client)
     # make the client join all the rooms that we're in
@@ -197,6 +205,11 @@ class Bouncer
 
     # We're all initialized, allow connections
     @connected = true
+    @waiting_clients.each do |client|
+      client.say_as_tkellem("Now connected.")
+      connect_client(client)
+    end
+    @waiting_clients.clear
   end
 
 end
