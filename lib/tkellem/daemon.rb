@@ -46,10 +46,6 @@ class Tkellem::Daemon
       exit(status ? 0 : 1)
     when 'restart'
       stop if status(false)
-      while status(false)
-        print "."
-        sleep(0.5)
-      end
       daemonize
       start
     when 'admin'
@@ -104,18 +100,25 @@ class Tkellem::Daemon
     @daemon = true
     File.open(pid_file, 'wb') { |f| f.write(Process.pid.to_s) }
 
-    # TODO: set up logging
+    # TODO: support syslog
+    require 'logger'
+    logger = Logger.new(log_file)
     STDIN.reopen("/dev/null")
-    STDOUT.reopen("/dev/null")
+    STDOUT.reopen(log_file, 'a')
     STDERR.reopen(STDOUT)
-    # STDOUT.sync = STDERR.sync = true
+    STDOUT.sync = STDERR.sync = true
   end
 
   def stop
     pid = File.read(pid_file) if File.file?(pid_file)
     if pid.to_i > 0
-      puts "Stopping tkellem #{pid}..."
+      puts "Stopping tkellem #{pid}"
       Process.kill('INT', pid.to_i)
+      while status(false)
+        print "."
+        sleep(0.5)
+      end
+      puts
     else
       status
     end
@@ -150,6 +153,10 @@ class Tkellem::Daemon
 
   def socket_file
     File.join(path, 'tkellem.socket')
+  end
+
+  def log_file
+    File.join(path, 'tkellem.log')
   end
 
 end
