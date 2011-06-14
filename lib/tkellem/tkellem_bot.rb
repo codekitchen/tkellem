@@ -127,9 +127,9 @@ class TkellemBot
       register(name)
       cattr_accessor :model
       self.model = model
-      options.set('add', '--add', '-a', "Add a #{model.name}")
-      options.set('remove', '--remove', '-r', "Remove a #{model.name}")
-      options.set('list', '--list', '-l', "List the current #{model.name.pluralize}")
+      options.set('add', '--add', '-a', "Add a #{model}")
+      options.set('remove', '--remove', '-r', "Remove a #{model}")
+      options.set('list', '--list', '-l', "List the current #{model.to_s.pluralize}")
     end
 
     def show(m)
@@ -254,6 +254,39 @@ class TkellemBot
     end
   end
 
+  class AtConnectCommand < CRUDCommand
+    register_crud 'atconnect', 'At-Connect'
+
+    # options.set('network', '--network=network', '-n', 'Network to modify at-connect on')
+    options.set('username', '--user=username', '-u', 'Modify a user-specific network for another user')
+
+    def list(args, user, network = nil)
+      network_name, network, user = NetworkCommand.get_network(args, user) unless network
+      raise(Command::ArgumentError, "No network found") unless network
+      r "At connect:"
+      network.at_connect.each { |line| r "    /#{line}" }
+    end
+
+    def remove(args, user)
+      network_name, network, user = NetworkCommand.get_network(args, user)
+      raise(Command::ArgumentError, "No network found") unless network
+      line = args[:rest].join(' ')
+      network.at_connect = network.at_connect.reject { |l| l == line }
+      network.save
+      list(args, user, network)
+    end
+
+    def add(args, user)
+      network_name, network, user = NetworkCommand.get_network(args, user)
+      raise(Command::ArgumentError, "No network found") unless network
+      line = args[:rest].join(' ')
+      raise(Command::ArgumentError, "atconnect commands must start with a /") unless line[0] == '/'[0]
+      network.at_connect = network.at_connect + [line]
+      network.save
+      list(args, user, network)
+    end
+  end
+
   class NetworkCommand < CRUDCommand
     register_crud 'network', Host
 
@@ -269,7 +302,7 @@ class TkellemBot
       "#{host.network.name}#{' (public)' if host.network.public?} " + host.network.hosts.map { |h| "[#{h}]" }.join(' ')
     end
 
-    def get_network(args, user)
+    def self.get_network(args, user)
       network_name = args[:rest].shift
       if args['username']
         if Command.admin_user?(user)
@@ -281,10 +314,14 @@ class TkellemBot
 
       network = Network.first(:conditions => { :name => network_name, :user_id => user.id }) if user
       network ||= Network.first(:conditions => { :name => network_name, :user_id => nil })
-      if network && network.public? && !self.class.admin_user?(user)
+      if network && network.public? && !admin_user?(user)
         raise Command::ArgumentError, "Only admins can modify public networks"
       end
       return network_name, network, user
+    end
+
+    def get_network(args, user)
+      self.class.get_network(args, user)
     end
 
     def remove(args, user)

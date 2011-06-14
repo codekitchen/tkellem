@@ -7,6 +7,12 @@ class Network < ActiveRecord::Base
   # can join them.
   belongs_to :user
 
+  serialize :at_connect, Array
+
+  def at_connect
+    read_attribute(:at_connect) || []
+  end
+
   def public?
     !user
   end
