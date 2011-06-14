@@ -21,7 +21,7 @@ This will have to do as a quickstart guide, for now:
     $ tkellem start
     $ tkellem admin
     > help
-    > listen ircs://0.0.0.0:8765
+    > listen --add ircs://0.0.0.0:8765
     > user --add <my-name> --admin
     > password --user <my-name> <my-new-password>
     > network --add --public freenode ircs://irc.freenode.org:7000

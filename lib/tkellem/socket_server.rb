@@ -23,6 +23,10 @@ module SocketServer
       send_data("#{line}\n")
     end
     send_data("\0\n")
+  rescue => e
+    send_data("Error running command: #{e}\n")
+    e.backtrace.each { |l| send_data("#{l}\n") }
+    send_data("\0\n")
   end
 end
 

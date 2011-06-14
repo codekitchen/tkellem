@@ -221,7 +221,7 @@ class TkellemBot
     end
 
     def attributes(args, user)
-      find_attributes(args).merge({ :role => (args['admin'] ? 'admin' : 'user') })
+      find_attributes(args, user).merge({ :role => (args['admin'] ? 'admin' : 'user') })
     end
   end
 
