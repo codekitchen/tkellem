@@ -17,11 +17,9 @@ functionality.
 
 This will have to do as a quickstart guide, for now:
 
-    $ git clone git://github.com/codekitchen/tkellem.git
-    $ cd tkellem
-    $ bundle install
-    $ bundle exec bin/tkellem start
-    $ bundle exec bin/tkellem admin
+    $ gem install tkellem
+    $ tkellem start
+    $ tkellem admin
     > help
     > listen ircs://0.0.0.0:8765
     > user --add <my-name> --admin
@@ -37,3 +35,7 @@ Then connect to tkellem with an irc client:
     nickname: <my-name>
     login: <my-name>@freenode
     server password: <my-new-password>
+
+Note that all config and log files are stored in ~/.tkellem of the user
+you run `tkellem start` as. You also need to run `tkellem admin` as this
+same user, in order to have access to the admin console.
