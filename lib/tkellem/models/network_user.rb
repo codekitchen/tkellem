@@ -13,7 +13,7 @@ class NetworkUser < ActiveRecord::Base
   # we use the network's at_connect until it is modified and overwritten for
   # this specific network user
   def at_connect
-    read_attribute(:at_connect).presence || network.at_connect.presence || []
+    network.at_connect + (read_attribute(:at_connect) || [])
   end
 end
 
