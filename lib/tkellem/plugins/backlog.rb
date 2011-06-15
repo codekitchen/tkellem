@@ -90,13 +90,14 @@ class Backlog
       # transient messages
       return
     when 'PRIVMSG'
+      return if msg.ctcp? && !msg.action?
       ctx = msg.args.first
       if ctx == @bouncer.nick
         # incoming pm, fake ctx to be the sender's nick
         ctx = msg.prefix.split(/[!~@]/, 2).first
       end
       stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S < #{msg.prefix}: #{msg.args.last}"))
+      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}"))
       update_pos(ctx, stream.pos)
     end
   end
@@ -104,9 +105,10 @@ class Backlog
   def client_msg(msg)
     case msg.command
     when 'PRIVMSG'
+      return if msg.ctcp? && !msg.action?
       ctx = msg.args.first
       stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S > #{msg.args.last}"))
+      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S > #{'* ' if msg.action?}#{msg.args.last}"))
       update_pos(ctx, stream.pos)
     end
   end
@@ -145,11 +147,17 @@ class Backlog
   def parse_line(line, ctx_name)
     timestamp = Time.parse(line[0, 19])
     case line[20..-1]
-    when %r{^> (.+)$}
-      msg = IrcMessage.new(nil, 'PRIVMSG', [ctx_name, $1])
+    when %r{^> (\* )?(.+)$}
+      msg = IrcMessage.new(nil, 'PRIVMSG', [ctx_name, $2])
+      if $1 == '* '
+        msg.ctcp = 'ACTION'
+      end
       return timestamp, msg
-    when %r{^< ([^:]+): (.+)$}
-      msg = IrcMessage.new($1, 'PRIVMSG', [ctx_name, $2])
+    when %r{^< (\* )?([^:]+): (.+)$}
+      msg = IrcMessage.new($2, 'PRIVMSG', [ctx_name, $3])
+      if $1 == '* '
+        msg.ctcp = 'ACTION'
+      end
       return timestamp, msg
     else
       nil

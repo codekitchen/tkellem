@@ -45,3 +45,14 @@ describe IrcMessage do
     line2.args.last.should == "three"
   end
 end
+
+describe IrcMessage, "CTCP" do
+  it "should parse basic ACTION messages" do
+    msg = IrcMessage.parse(":user1 PRIVMSG #room :\1ACTION is a loser on IRC\1")
+    msg.command.should == 'PRIVMSG'
+    msg.args.should == ['#room', 'is a loser on IRC']
+    msg.ctcp?.should == true
+    msg.action?.should == true
+    msg.to_s.should == ":user1 PRIVMSG #room :\1ACTION is a loser on IRC\1"
+  end
+end
