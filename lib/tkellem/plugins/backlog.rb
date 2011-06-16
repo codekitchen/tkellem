@@ -45,7 +45,7 @@ class Backlog
     @devices = {}
     @streams = {}
     @starting_pos = {}
-    @dir = File.expand_path("~/.tkellem/logs/#{bouncer.user.name}/#{bouncer.network.name}")
+    @dir = File.expand_path("~/.tkellem/logs/#{bouncer.user.username}/#{bouncer.network.name}")
     FileUtils.mkdir_p(@dir)
   end
 
