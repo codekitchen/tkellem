@@ -57,6 +57,7 @@ class Backlog
     # open stream in append-only mode
     return @streams[ctx] if @streams[ctx]
     stream = @streams[ctx] = File.open(stream_filename(ctx), 'ab')
+    stream.seek(0, IO::SEEK_END)
     @starting_pos[ctx] = stream.pos
     stream
   end
