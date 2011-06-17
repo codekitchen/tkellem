@@ -44,8 +44,12 @@ class User < ActiveRecord::Base
   end
 
   def set_password!(password)
-    self.password = OpenSSL::Digest::SHA1.hexdigest(password)
+    self.password = password
     self.save!
+  end
+
+  def password=(password)
+    write_attribute(:password, password ? OpenSSL::Digest::SHA1.hexdigest(password) : nil)
   end
 
   def admin?

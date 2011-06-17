@@ -26,7 +26,7 @@ module IrcServerConnection
   end
 
   def ssl_handshake_completed
-    EM.next_tick { @bouncer.connection_established }
+    EM.next_tick { @bouncer.connection_established(self) }
   end
 
   def receive_line(line)

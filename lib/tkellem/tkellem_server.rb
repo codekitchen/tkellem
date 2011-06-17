@@ -18,15 +18,19 @@ module Tkellem
 class TkellemServer
   include Tkellem::EasyLogger
 
+  attr_reader :bouncers
+
   def initialize
     @listeners = {}
     @bouncers = {}
 
-    ActiveRecord::Base.establish_connection({
-      :adapter => 'sqlite3',
-      :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
-    })
-    ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
+    unless ActiveRecord::Base.connected?
+      ActiveRecord::Base.establish_connection({
+        :adapter => 'sqlite3',
+        :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
+      })
+      ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
+    end
 
     ListenAddress.all.each { |a| listen(a) }
     NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }

@@ -19,11 +19,11 @@ module BouncerConnection
     @name = 'new-conn'
     @data = {}
   end
-  attr_reader :ssl, :bouncer, :name, :device_name
+  attr_reader :ssl, :bouncer, :name, :device_name, :connecting_nick
   alias_method :log_name, :name
 
   def nick
-    @bouncer ? @bouncer.nick : @nick
+    @bouncer ? @bouncer.nick : @connecting_nick
   end
 
   def data(key)
@@ -82,7 +82,7 @@ module BouncerConnection
     elsif command == 'PASS' && @state == :auth
       @password = msg.args.first
     elsif command == 'NICK' && @state == :auth
-      @nick = msg.args.first
+      @connecting_nick = msg.args.first
       maybe_connect
     elsif command == 'QUIT'
       close_connection
@@ -109,7 +109,7 @@ module BouncerConnection
   end
 
   def maybe_connect
-    if @nick && @username && @password && !@user
+    if @connecting_nick && @username && @password && !@user
       @name = @username
       @user = User.authenticate(@username, @password)
       return error!("Unknown username: #{@username} or bad password.") unless @user
@@ -136,7 +136,7 @@ module BouncerConnection
   end
 
   def simulate_join(room)
-    send_msg(":#{nick}!#{name}@tkellem JOIN #{room}")
+    send_msg(":#{nick} JOIN #{room}")
     # TODO: intercept the NAMES response so that only this bouncer gets it
     # Otherwise other clients might show an "in this room" line.
     @bouncer.send_msg("NAMES #{room}\r\n")

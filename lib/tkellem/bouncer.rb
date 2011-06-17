@@ -58,6 +58,8 @@ class Bouncer
       return
     end
 
+    # force the client nick
+    client.send_msg(":#{client.connecting_nick} NICK #{nick}") if client.connecting_nick != nick
     send_welcome(client)
     # make the client join all the rooms that we're in
     @rooms.each { |room| client.simulate_join(room) }
@@ -155,9 +157,10 @@ class Bouncer
     @conn.send_data("#{msg}\r\n")
   end
 
-  def connection_established
+  def connection_established(conn)
+    @conn = conn
     # TODO: support sending a real username, realname, etc
-    send_msg("USER #{@nick} localhost blah :#{@nick}")
+    send_msg("USER #{@user.username} somehost tkellem :#{@user.name}")
     change_nick(@nick, true)
     check_away_status
   end
@@ -193,7 +196,7 @@ class Bouncer
     @last_connect = Time.now
     @cur_host = (@cur_host || 0) % hosts.length
     host = hosts[@cur_host]
-    @conn = EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
+    EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
   end
 
   def ready!
