@@ -79,16 +79,18 @@ module BouncerConnection
       if msg.args.first =~ /req/i
         send_msg("CAP NAK")
       end
-    elsif command == 'PASS'
-      unless @password
-        @password = msg.args.first
-      end
+    elsif command == 'PASS' && @state == :auth
+      @password = msg.args.first
     elsif command == 'NICK' && @state == :auth
       @nick = msg.args.first
+      maybe_connect
     elsif command == 'QUIT'
       close_connection
-    elsif command == 'USER'
-      msg_user(msg)
+    elsif command == 'USER' && @state == :auth
+      unless @username
+        @username, @conn_info = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
+      end
+      maybe_connect
     elsif @state == :auth
       error!("Protocol error. You must authenticate first.")
     elsif @state == :connected
@@ -106,15 +108,14 @@ module BouncerConnection
     end
   end
 
-  def msg_user(msg)
-    unless @user
-      @username, rest = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
+  def maybe_connect
+    if @nick && @username && @password && !@user
       @name = @username
       @user = User.authenticate(@username, @password)
       return error!("Unknown username: #{@username} or bad password.") unless @user
 
-      if rest && !rest.empty?
-        @conn_name, @device_name = rest.split(':', 2)
+      if @conn_info && !@conn_info.empty?
+        @conn_name, @device_name = @conn_info.split(':', 2)
         # 'default' or missing device_name to use the default backlog
         # pass a device_name to have device-independent backlogs
         @device_name = @device_name.presence || 'default'

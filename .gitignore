@@ -5,3 +5,4 @@ pkg/*
 coverage/*
 doc/*
 .yardoc/*
+test.log
