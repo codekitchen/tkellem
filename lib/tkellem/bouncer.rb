@@ -153,6 +153,7 @@ class Bouncer
   alias_method :log_name, :name
 
   def send_msg(msg)
+    return unless @conn
     trace "to server: #{msg}"
     @conn.send_data("#{msg}\r\n")
   end
