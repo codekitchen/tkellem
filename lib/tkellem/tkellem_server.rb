@@ -37,6 +37,10 @@ class TkellemServer
     Observer.forward_to << self
   end
 
+  def stop
+    Observer.forward_to.delete(self)
+  end
+
   # callbacks for AR observer events
   def after_create(obj)
     case obj

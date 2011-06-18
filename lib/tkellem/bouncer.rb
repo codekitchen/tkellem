@@ -122,6 +122,10 @@ class Bouncer
       # swallow it, we handle ping-pong from clients separately, in
       # BouncerConnection
       false
+    when '433'
+      # nick already in use, try another
+      change_nick("#{@nick}_")
+      false
     else
       true
     end
