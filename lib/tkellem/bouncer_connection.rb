@@ -31,10 +31,12 @@ module BouncerConnection
   end
 
   def post_init
-    if ssl
-      start_tls :verify_peer => false
-    else
-      ssl_handshake_completed
+    failsafe(:post_init) do
+      if ssl
+        start_tls :verify_peer => false
+      else
+        ssl_handshake_completed
+      end
     end
   end
 
@@ -66,45 +68,39 @@ module BouncerConnection
   end
 
   def receive_line(line)
-    trace "from client: #{line}"
-    msg = IrcMessage.parse(line)
+    failsafe("message: {#{line}}") do
+      trace "from client: #{line}"
+      msg = IrcMessage.parse(line)
 
-    command = msg.command
-    if @user && command == 'PRIVMSG' && msg.args.first == '-tkellem'
-      msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
-    elsif command == 'TKELLEM'
-      msg_tkellem(msg)
-    elsif command == 'CAP'
-      # TODO: full support for CAP -- this just gets mobile colloquy connecting
-      if msg.args.first =~ /req/i
-        send_msg("CAP NAK")
+      command = msg.command
+      if @user && command == 'PRIVMSG' && msg.args.first == '-tkellem'
+        msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
+      elsif command == 'TKELLEM'
+        msg_tkellem(msg)
+      elsif command == 'CAP'
+        # TODO: full support for CAP -- this just gets mobile colloquy connecting
+        if msg.args.first =~ /req/i
+          send_msg("CAP NAK")
+        end
+      elsif command == 'PASS' && @state == :auth
+        @password = msg.args.first
+      elsif command == 'NICK' && @state == :auth
+        @connecting_nick = msg.args.first
+        maybe_connect
+      elsif command == 'QUIT'
+        close_connection
+      elsif command == 'USER' && @state == :auth
+        unless @username
+          @username, @conn_info = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
+        end
+        maybe_connect
+      elsif @state == :auth
+        error!("Protocol error. You must authenticate first.")
+      elsif @state == :connected
+        @bouncer.client_msg(self, msg)
+      else
+        say_as_tkellem("You must connect to an irc network to do that.")
       end
-    elsif command == 'PASS' && @state == :auth
-      @password = msg.args.first
-    elsif command == 'NICK' && @state == :auth
-      @connecting_nick = msg.args.first
-      maybe_connect
-    elsif command == 'QUIT'
-      close_connection
-    elsif command == 'USER' && @state == :auth
-      unless @username
-        @username, @conn_info = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
-      end
-      maybe_connect
-    elsif @state == :auth
-      error!("Protocol error. You must authenticate first.")
-    elsif @state == :connected
-      @bouncer.client_msg(self, msg)
-    else
-      say_as_tkellem("You must connect to an irc network to do that.")
-    end
-
-  rescue => e
-    error "Error handling message: {#{msg}} #{e}"
-    e.backtrace.each { |l| error l }
-    begin
-      error! "Internal Tkellem error."
-    rescue
     end
   end
 
@@ -148,7 +144,9 @@ module BouncerConnection
   end
 
   def unbind
-    @bouncer.disconnect_client(self) if @bouncer
+    failsafe(:unbind) do
+      @bouncer.disconnect_client(self) if @bouncer
+    end
   end
 end
 
