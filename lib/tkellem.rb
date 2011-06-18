@@ -4,11 +4,16 @@ module Tkellem
 
     def self.logger=(new_logger)
       @logger = new_logger
+      if @logger.is_a?(Logger)
+        @logger.formatter = proc do |severity, time, progname, msg|
+          obj, msg = msg if msg.is_a?(Array)
+          "#{time.strftime('%y-%m-%dT%H:%M:%S')} #{severity[0,3]} #{(obj && obj.log_name) || 'tkellem'} (#{obj && obj.object_id}): #{msg}\n"
+        end
+      end
     end
     def self.logger
       return @logger if @logger
-      @logger = Logger.new(STDERR)
-      @logger.datetime_format = "%Y-%m-%d"
+      self.logger = Logger.new(STDERR)
       @logger
     end
 
@@ -20,7 +25,7 @@ module Tkellem
     end
 
     def log_name
-      ""
+      nil
     end
 
     def trace(msg)
@@ -39,8 +44,12 @@ module Tkellem
     ::Logger::Severity.constants.each do |level|
       next if level == "UNKNOWN"
       module_eval(<<-EVAL, __FILE__, __LINE__)
-      def #{level.downcase}(msg)
-        EasyLogger.logger.#{level.downcase}("\#{log_name} (\#{object_id}): \#{msg}")
+      def #{level.downcase}(msg, &block)
+        if block
+          EasyLogger.logger.#{level.downcase} { [self, block.call] }
+        else
+          EasyLogger.logger.#{level.downcase}([self, msg])
+        end
       end
       EVAL
     end
