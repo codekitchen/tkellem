@@ -87,6 +87,9 @@ class Bouncer
       @away[client] = msg.args.last
       check_away_status
       false
+    when 'NICK'
+      @nick = msg.args.last
+      true
     else
       true
     end
@@ -126,6 +129,11 @@ class Bouncer
       # nick already in use, try another
       change_nick("#{@nick}_")
       false
+    when 'NICK'
+      if msg.prefix == nick
+        @nick = msg.args.last
+      end
+      true
     else
       true
     end
@@ -187,7 +195,7 @@ class Bouncer
   end
 
   def send_welcome(bouncer_conn)
-    @welcomes.each { |msg| bouncer_conn.send_msg(msg) }
+    @welcomes.each { |msg| msg.args[0] = nick; bouncer_conn.send_msg(msg) }
   end
 
   def connect!

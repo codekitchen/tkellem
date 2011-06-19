@@ -52,7 +52,8 @@ describe Bouncer, "connection" do
   end
 
   after(:each) do
-    $tk_server.stop if defined?($tk_server)
+    $tk_server.stop if $tk_server
+    $tk_server = nil
   end
 
   def network_user(opts = {})
@@ -103,5 +104,34 @@ describe Bouncer, "connection" do
     @bouncer.server_msg(m ":server 433 * mynick :Nickname already in use")
     @bouncer.nick.should == 'mynick_'
     @bouncer.send :ready!
+  end
+
+  it "should change nicks if a client sends nick after connecting" do
+    network_user(:nick => 'mynick')
+    bouncer(:connect => true)
+    @bouncer.server_msg(m ":mynick JOIN #t1")
+    client_connection
+    @client.should_receive(:send_msg).with(":mynick JOIN #t1")
+    @client.receive_line("PASS test123")
+    @client.receive_line("NICK mynick")
+    @client.receive_line("USER #{@user.username}@#{@network.name} a b :c")
+    @bouncer.nick.should == 'mynick'
+    @bouncer.client_msg(@client, m("NICK some_other"))
+    @bouncer.nick.should == 'some_other'
+  end
+
+  it "should change nicks if a server forces nick change" do
+    network_user(:nick => 'mynick')
+    bouncer(:connect => true)
+    @bouncer.server_msg(m ":mynick JOIN #t1")
+    client_connection
+    @client.should_receive(:send_msg).with(":mynick JOIN #t1")
+    @client.receive_line("PASS test123")
+    @client.receive_line("NICK mynick")
+    @client.receive_line("USER #{@user.username}@#{@network.name} a b :c")
+    @bouncer.nick.should == 'mynick'
+    @client.should_receive(:send_msg).with(m ":mynick NICK some_other")
+    @bouncer.server_msg(m ":mynick NICK some_other")
+    @bouncer.nick.should == 'some_other'
   end
 end
