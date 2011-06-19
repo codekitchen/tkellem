@@ -7,7 +7,7 @@ class TkellemBot
   # careful here -- if no user is given, it's assumed the command is running as
   # an admin
   def self.run_command(line, user, &block)
-    args = Shellwords.shellwords(line.downcase)
+    args = Shellwords.shellwords(line)
     command_name = args.shift.upcase
     command = commands[command_name]
 
@@ -348,6 +348,44 @@ class TkellemBot
 
       uri = ListenCommand.get_uri(args)
       { :network => network, :address => uri.host, :port => uri.port, :ssl => (uri.scheme == 'ircs') }
+    end
+  end
+
+  class SettingCommand < Command
+    register 'settings'
+
+    def self.admin_only?
+      true
+    end
+
+    def self.setting_resources(name)
+      @setting_resources ||= YAML.load_file(File.expand_path("../../../resources/setting_descriptions.yml", __FILE__))
+      @setting_resources[name] || {}
+    end
+
+    def execute(args, user)
+      rest = args[:rest]
+      case rest.size
+      when 0
+        r "Settings:"
+        Setting.all.each { |s| r "    #{s}" }
+      when 1
+        setting = Setting.find_by_name(rest.first)
+        if setting
+          r(setting.to_s)
+          desc = self.class.setting_resources(setting.name)
+          if desc['help']
+            desc['help'].each_line { |l| r l }
+          end
+        else
+          r("No setting with that name")
+        end
+      when 2
+        setting = Setting.set(rest[0], rest[1])
+        setting ? r(setting.to_s) : r("No setting with that name")
+      else
+        show_help
+      end
     end
   end
 end

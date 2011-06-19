@@ -4,16 +4,25 @@ require 'active_record'
 require 'tkellem/bouncer_connection'
 require 'tkellem/bouncer'
 
-require 'tkellem/models/user'
-require 'tkellem/models/network'
 require 'tkellem/models/host'
-require 'tkellem/models/network_user'
 require 'tkellem/models/listen_address'
+require 'tkellem/models/network'
+require 'tkellem/models/network_user'
+require 'tkellem/models/setting'
+require 'tkellem/models/user'
 
-require 'tkellem/plugins/push_service'
 require 'tkellem/plugins/backlog'
+require 'tkellem/plugins/push_service'
 
 module Tkellem
+
+unless ActiveRecord::Base.connected?
+  ActiveRecord::Base.establish_connection({
+    :adapter => 'sqlite3',
+    :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
+  })
+  ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
+end
 
 class TkellemServer
   include Tkellem::EasyLogger
@@ -23,14 +32,6 @@ class TkellemServer
   def initialize
     @listeners = {}
     @bouncers = {}
-
-    unless ActiveRecord::Base.connected?
-      ActiveRecord::Base.establish_connection({
-        :adapter => 'sqlite3',
-        :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
-      })
-      ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
-    end
 
     ListenAddress.all.each { |a| listen(a) }
     NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }

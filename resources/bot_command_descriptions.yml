@@ -31,6 +31,17 @@ NETWORK:
   help: |+
     Manage networks. --add will add a new network, or a new connection host to an existing network. Public networks can only be created by admins, and can be joined by anybody.
 
+    To connect to a network, change the server username in your irc client to reflect what network you want to connect to, in the form of username@network. For instance, to connect to a network called "freenode" as the user "joe", you would set your username to joe@freenode
+
     Examples:
         NETWORK --add --public freenode irc://irc.freenode.org:6667
         NETWORK --add freenode ircs://irc.freenode.org:7000
+
+SETTINGS:
+  banner: "SETTINGS [<name>] [<new_value>]"
+  help: |+
+    View and modify global settings.
+
+    Examples:
+        SETTINGS
+        SETTINGS public_registration true

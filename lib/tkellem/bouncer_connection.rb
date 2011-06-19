@@ -45,6 +45,7 @@ module BouncerConnection
 
   def error!(msg)
     info("ERROR :#{msg}")
+    say_as_tkellem(msg)
     send_msg("ERROR :#{msg}")
     close_connection(true)
   end
@@ -58,8 +59,28 @@ module BouncerConnection
   end
 
   def msg_tkellem(msg)
-    TkellemBot.run_command(msg.args.join(' '), @user) do |response|
-      say_as_tkellem(response)
+    case @state
+    when :recaptcha
+      if @recaptcha.valid_response?(msg.args.last)
+        say_as_tkellem "Looks like you're human. Whew, I hate robots."
+        user_registration_get_password
+      else
+        say_as_tkellem "Nope, that's not right. Please try again."
+      end
+    when :password
+      user = User.create(:username => @username, :password => msg.args.last, :role => 'user')
+      if user.errors.any?
+        error!("There was an error creating your user account. Please try again, or contact the tkellem admin.")
+      else
+        @user = user
+        say_as_tkellem("Your account has been created. Set your password in your IRC client and re-connect to start using tkellem.")
+      end
+    else
+      if @user
+        TkellemBot.run_command(msg.args.join(' '), @user) do |response|
+          say_as_tkellem(response)
+        end
+      end
     end
   end
 
@@ -73,7 +94,7 @@ module BouncerConnection
       msg = IrcMessage.parse(line)
 
       command = msg.command
-      if @user && command == 'PRIVMSG' && msg.args.first == '-tkellem'
+      if @state != :auth && command == 'PRIVMSG' && msg.args.first == '-tkellem'
         msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
       elsif command == 'TKELLEM'
         msg_tkellem(msg)
@@ -105,7 +126,8 @@ module BouncerConnection
   end
 
   def maybe_connect
-    if @connecting_nick && @username && @password && !@user
+    return unless @connecting_nick && @username && !@user
+    if @password
       @name = @username
       @user = User.authenticate(@username, @password)
       return error!("Unknown username: #{@username} or bad password.") unless @user
@@ -122,7 +144,39 @@ module BouncerConnection
         @name = "#{@username}-console"
         connect_to_tkellem_console
       end
+    else
+      user = User.find_by_username(@username)
+      if user || user_registration == 'closed'
+        error!("No password given. Make sure to set your password in your IRC client config, and connect again.")
+        if user_registration != 'closed'
+          error!("If you are trying to register for a new account, this username is already taken. Please select another.")
+        end
+      else
+        @state = :registration
+        say_as_tkellem "Welcome to tkellem, #{@username}. If you already have an account and were trying to connect, please check your username, as it wasn't recognized."
+        say_as_tkellem "Otherwise, follow these instructions to create an account."
+        say_as_tkellem ' '
+        if recaptcha = Setting.get('recaptcha_api_key').presence
+          @state = :recaptcha
+          require 'tkellem/plugins/recaptcha'
+          @recaptcha = Recaptcha.new(*recaptcha.split(',', 2))
+          say_as_tkellem "First, you'll need to take a captcha test to verify that you aren't an evil robot bent on destroying humankind."
+          say_as_tkellem "Visit this URL, and tell me the code you are given after solving the captcha: #{@recaptcha.challenge_url}"
+          return
+        end
+        user_registration_get_password
+      end
     end
+  end
+
+  def user_registration
+    val = Setting.get('user_registration')
+    %(open verified).include?(val) ? val : 'closed'
+  end
+
+  def user_registration_get_password
+    @state = :password
+    say_as_tkellem "You need to set an initial password for your account. Enter your password now:"
   end
 
   def connect_to_tkellem_console
