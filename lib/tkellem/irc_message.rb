@@ -20,7 +20,7 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
 
     msg = self.new(prefix, command, args)
 
-    if args.last.match(%r{#{"\x01"}([^ ]+)([^\1]*)#{"\x01"}})
+    if args.last.try(:match, %r{#{"\x01"}([^ ]+)([^\1]*)#{"\x01"}})
       msg.ctcp = $1.upcase
       msg.args[-1] = $2.strip
     end

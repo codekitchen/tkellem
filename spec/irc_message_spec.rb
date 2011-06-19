@@ -21,6 +21,13 @@ describe IrcMessage, ".parse" do
     line.args.should == ["#myroom", "http://google.com/"]
     line.replay.should == orig
   end
+
+  it "should parse with no arguments" do
+    line = IrcMessage.parse("AWAY")
+    line.command.should == "AWAY"
+    line.args.should == []
+    line.replay.should == "AWAY"
+  end
 end
 
 describe IrcMessage, "#with_timestamp" do
