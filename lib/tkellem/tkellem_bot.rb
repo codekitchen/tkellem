@@ -6,7 +6,7 @@ module Tkellem
 class TkellemBot
   # careful here -- if no user is given, it's assumed the command is running as
   # an admin
-  def self.run_command(line, user, &block)
+  def self.run_command(line, user, network_user, &block)
     args = Shellwords.shellwords(line)
     command_name = args.shift.upcase
     command = commands[command_name]
@@ -16,35 +16,27 @@ class TkellemBot
       return
     end
 
-    command.run(args, user, block)
+    command.run(args, user, network_user, block)
   end
 
   class Command
-    attr_accessor :args
+    attr_accessor :args, :user, :network_user, :opts, :options
 
-    def self.options
-      unless defined?(@options)
-        @options = OptionParser.new
-        class << @options
-          attr_accessor :cmd
-          def set(name, *args)
-            self.on(*args) { |v| cmd.args[name] = v }
-          end
-        end
-      end
-      @options
+    def self.option(name, *args)
+      @options ||= {}
+      @options[name] = args
     end
 
-    def options
-      self.class.options
+    def self.admin_option(name, *args)
+      option(name, *args)
+      @admin_onlies ||= []
+      @admin_onlies << name
     end
 
     def self.register(cmd_name)
       cattr_accessor :name
       self.name = cmd_name
       TkellemBot.commands[name.upcase] = self
-      self.options.banner = resources(name)['banner'] if resources(name)['banner']
-      self.options.separator(resources(name)['help']) if resources(name)['help']
     end
 
     def self.resources(name)
@@ -55,35 +47,51 @@ class TkellemBot
     class ArgumentError < RuntimeError; end
 
     def self.admin_only?
-      false
+      true
     end
 
-    def self.run(args_arr, user, block)
+    def self.build_options(user, cmd = nil)
+      OptionParser.new.tap do |options|
+        @options.try(:each) { |opt_name,args|
+          next if !admin_user?(user) && @admin_onlies.include?(opt_name)
+          options.on(*args) { |v| cmd.opts[opt_name] = v }
+        }
+        resources = self.resources(name)
+        options.banner = resources['banner'] if resources['banner']
+        options.separator(resources['help']) if resources['help']
+      end
+    end
+
+    def self.run(args_arr, user, network_user, block)
       if admin_only? && !admin_user?(user)
         block.call "You can only run #{name} as an admin."
         return
       end
       cmd = self.new(block)
-      options.cmd = cmd
-      options.parse!(args_arr)
-      cmd.args[:rest] = args_arr
-      cmd.execute(cmd.args, user)
-    rescue ArgumentError => e
+
+      cmd.args = args_arr
+      cmd.user = user
+      cmd.network_user = network_user
+
+      cmd.options = build_options(user, cmd)
+      cmd.options.parse!(args_arr)
+
+      cmd.execute
+    rescue ArgumentError, OptionParser::InvalidOption => e
       cmd.respond e.to_s
-      cmd.show_help
     end
 
     def initialize(responder)
       @responder = responder
-      @args = {}
+      @opts = {}
     end
 
     def show_help
-      respond(options.to_s)
+      respond(options)
     end
 
     def respond(text)
-      text.each_line { |l| @responder.call(l.chomp) }
+      text.to_s.each_line { |l| @responder.call(l.chomp) }
     end
     alias_method :r, :respond
 
@@ -98,8 +106,12 @@ class TkellemBot
   class Help < Command
     register 'help'
 
-    def execute(args, user)
-      name = args[:rest].first
+    def self.admin_only?
+      false
+    end
+
+    def execute
+      name = args.shift.try(:upcase)
       r "**** tkellem help ****"
       if name.nil?
         r "For more information on a command, type:"
@@ -111,12 +123,12 @@ class TkellemBot
           next if command.admin_only? && user && !user.admin?
           r "#{name}#{' ' * (25-name.length)}"
         end
-      elsif (command = TkellemBot.commands[name.upcase])
+      elsif (command = TkellemBot.commands[name])
         r "Help for #{command.name}:"
         r ""
-        r command.options.to_s
+        r command.build_options(user)
       else
-        r "No help available for #{args.first.upcase}."
+        r "No help available for #{name}."
       end
       r "**** end of help ****"
     end
@@ -127,26 +139,49 @@ class TkellemBot
       register(name)
       cattr_accessor :model
       self.model = model
-      options.set('add', '--add', '-a', "Add a #{model}")
-      options.set('remove', '--remove', '-r', "Remove a #{model}")
-      options.set('list', '--list', '-l', "List the current #{model.to_s.pluralize}")
+      option('remove', '--remove', '-r', "delete the specified record")
     end
 
     def show(m)
       m.to_s
     end
 
-    def find_attributes(args, user)
-      attributes(args, user)
+    def find_attributes
+      attributes
     end
 
-    def list(args, user)
+    def list
       r "All #{self.class.name.pluralize}:"
       model.all.each { |m| r "    #{show(m)}" }
     end
 
-    def remove(args, user)
-      instance = model.first(:conditions => find_attributes(args, user))
+    def modify
+      instance = model.first(:conditions => find_attributes)
+      new_record = false
+      if instance
+        instance.attributes = attributes
+        if instance.changed?
+          instance.save
+        else
+          respond "   #{show(instance)}"
+          return
+        end
+      else
+        new_record = true
+        instance = model.create(attributes)
+      end
+      if instance.errors.any?
+        respond "Error:"
+        instance.errors.full_messages.each { |m| respond "    #{m}" }
+        respond "    #{show(instance)}"
+      else
+        respond(new_record ? "created:" : "updated:")
+        respond "    #{show(instance)}"
+      end
+    end
+
+    def remove
+      instance = model.first(:conditions => find_attributes)
       if instance
         instance.destroy
         respond "Removed #{show(instance)}"
@@ -155,23 +190,13 @@ class TkellemBot
       end
     end
 
-    def add(args, user)
-      instance = model.create(attributes(args, user))
-      if instance.errors.any?
-        respond "Errors creating:"
-        instance.errors.full_messages.each { |m| respond "    #{m}" }
-      else
-        respond "#{show(instance)} added"
-      end
-    end
-
-    def execute(args, user)
-      if args['list']
-        list(args, user)
-      elsif args['remove']
-        remove(args, user)
-      elsif args['add']
-        add(args, user)
+    def execute
+      if opts['remove'] && args.length == 1
+        remove
+      elsif args.length == 0
+        list
+      elsif args.length == 1
+        modify
       else
         raise Command::ArgumentError, "Unknown sub-command"
       end
@@ -181,23 +206,19 @@ class TkellemBot
   class ListenCommand < CRUDCommand
     register_crud 'listen', ListenAddress
 
-    def self.admin_only?
-      true
-    end
-
-    def self.get_uri(args)
+    def self.get_uri(arg)
       require 'uri'
-      uri = URI.parse(args[:rest].first)
+      uri = URI.parse(arg)
       unless %w(irc ircs).include?(uri.scheme)
         raise Command::ArgumentError, "Invalid URI scheme: #{uri}"
       end
       uri
     rescue URI::InvalidURIError
-      raise Command::ArgumentError, "Invalid new address: #{args[:rest].first}"
+      raise Command::ArgumentError, "Invalid new address: #{arg}"
     end
 
-    def attributes(args, user)
-      uri = self.class.get_uri(args)
+    def attributes
+      uri = self.class.get_uri(args.first)
       { :address => uri.host, :port => uri.port, :ssl => (uri.scheme == 'ircs') }
     end
   end
@@ -205,33 +226,37 @@ class TkellemBot
   class UserCommand < CRUDCommand
     register_crud 'user', User
 
-    def self.admin_only?
-      true
-    end
-
-    options.set('user', '--user', '-u', 'Set new user as user (the default)')
-    options.set('admin', '--admin', 'Set new user as admin')
+    option('role', '--role=ROLE', 'Set user role [admin|user]')
 
     def show(user)
       "#{user.username}:#{user.role}"
     end
 
-    def find_attributes(args, user)
-      { :username => args[:rest].first }
+    def find_attributes
+      { :username => args.first.downcase }
     end
 
-    def attributes(args, user)
-      find_attributes(args, user).merge({ :role => (args['admin'] ? 'admin' : 'user') })
+    def attributes
+      find_attributes.tap { |attrs|
+        role = opts['role'].try(:downcase)
+        attrs['role'] = role if %w(user admin).include?(role)
+      }
     end
   end
 
   class PasswordCommand < Command
     register 'password'
 
-    options.set('username', '--user=username', '-u', 'Change password for other username')
+    admin_option('username', '--user=username', '-u', 'Change password for other username')
 
-    def execute(args, user)
-      if args['username']
+    def self.admin_only?
+      false
+    end
+
+    def execute
+      user = self.user
+
+      if opts['username']
         if Command.admin_user?(user)
           user = User.first(:conditions => { :username => args['username'] })
         else
@@ -243,134 +268,163 @@ class TkellemBot
         raise Command::ArgumentError, "User required"
       end
 
-      password = args[:rest].shift || ''
+      password = args.shift || ''
 
       if password.size < 4
         raise Command::ArgumentError, "New password too short"
       end
 
-      user.set_password!(password)
+      user.password = password
+      user.save!
       respond "New password set for #{user.username}"
     end
   end
 
-  class AtConnectCommand < CRUDCommand
-    register_crud 'atconnect', 'At-Connect'
+  class AtConnectCommand < Command
+    register 'atconnect'
 
-    # options.set('network', '--network=network', '-n', 'Network to modify at-connect on')
-    options.set('username', '--user=username', '-u', 'Modify a user-specific network for another user')
+    option('remove', '--remove', '-r', 'Remove previously configured command')
+    admin_option('network', '--network=network', '-n', 'Change atconnect for all users on a public network')
 
-    def list(args, user, network = nil)
-      network_name, network, user = NetworkCommand.get_network(args, user) unless network
-      raise(Command::ArgumentError, "No network found") unless network
-      r "At connect:"
-      network.at_connect.each { |line| r "    /#{line}" }
+    def self.admin_only?
+      false
     end
 
-    def remove(args, user)
-      network_name, network, user = NetworkCommand.get_network(args, user)
-      raise(Command::ArgumentError, "No network found") unless network
-      line = args[:rest].join(' ')
-      network.at_connect = network.at_connect.reject { |l| l == line }
-      network.save
-      list(args, user, network)
+    def list(target)
+      target.reload
+      if target.is_a?(NetworkUser) && target.network.public?
+        r "Network-wide commands are prefixed with [N], user-specific commands with [U]."
+        r "Network-wide commands can only be modified by admins."
+        list(target.network)
+      end
+      prefix = target.is_a?(Network) ? 'N' : 'U'
+      target.at_connect.try(:each) { |line| r "    [#{prefix}] #{line}" }
     end
 
-    def add(args, user)
-      network_name, network, user = NetworkCommand.get_network(args, user)
-      raise(Command::ArgumentError, "No network found") unless network
-      line = args[:rest].join(' ')
-      raise(Command::ArgumentError, "atconnect commands must start with a /") unless line[0] == '/'[0]
-      network.at_connect = network.at_connect + [line]
-      network.save
-      list(args, user, network)
+    def execute
+      if opts['network'].present? # only settable by admins
+        target = Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase])
+      else
+        target = network_user
+      end
+      raise(Command::ArgumentError, "No network found") unless target
+
+      if args.size == 0
+        r "At connect:"
+        list(target)
+      else
+        line = args.join(' ')
+        raise(Command::ArgumentError, "atconnect commands must start with a /") unless line[0] == '/'[0]
+        if opts['remove']
+          target.at_connect = target.at_connect.reject { |l| l == line }
+        else
+          target.at_connect = target.at_connect + [line]
+        end
+        target.save
+        r "At connect commands modified:"
+        list(target)
+      end
     end
   end
 
-  class NetworkCommand < CRUDCommand
-    register_crud 'network', Host
+  class NetworkCommand < Command
+    register 'network'
 
-    options.set('public', '--public', 'Set new network as public')
-    options.set('username', '--user=username', '-u', 'Create a user-specific network for another user')
-
-    def list(args, user)
-      r "All networks:"
-      Network.all.each { |m| r "    #{show(m.hosts.first)}" if m.hosts.first }
+    def self.admin_only?
+      false
     end
 
-    def show(host)
-      "#{host.network.name}#{' (public)' if host.network.public?} " + host.network.hosts.map { |h| "[#{h}]" }.join(' ')
+    option('remove', '--remove', '-r', "Remove a hostname for a network, or the entire network if no host is given.")
+    option('network', '--name=NETWORK', '-n', "Operate on a different network than the current connection.")
+    admin_option('public', '--public', "Create new public network. Once created, public/private status can't be modified.")
+
+    def list
+      public_networks = Network.all(:conditions => 'user_id IS NULL')
+      user_networks = user.reload.try(:networks) || []
+      if user_networks.present? && public_networks.present?
+        r "Public networks are prefixed with [P], user-specific networks with [U]."
+      end
+      (public_networks + user_networks).each do |net|
+        prefix = net.public? ? 'P' : 'U'
+        r "    [#{prefix}] #{show(net)}"
+      end
     end
 
-    def self.get_network(args, user)
-      network_name = args[:rest].shift
-      if args['username']
-        if Command.admin_user?(user)
-          user = User.first(:conditions => { :username => args['username'] })
-        else
-          raise Command::ArgumentError, "Only admins can change other user's networks"
-        end
+    def show(network)
+      "#{network.name} " + network.hosts.map { |h| "[#{h}]" }.join(' ')
+    end
+
+    def execute
+      # TODO: this got gross
+      if args.empty? && !opts['remove']
+        list
+        return
       end
 
-      network = Network.first(:conditions => { :name => network_name, :user_id => user.id }) if user
-      network ||= Network.first(:conditions => { :name => network_name, :user_id => nil })
-      if network && network.public? && !admin_user?(user)
-        raise Command::ArgumentError, "Only admins can modify public networks"
-      end
-      return network_name, network, user
-    end
-
-    def get_network(args, user)
-      self.class.get_network(args, user)
-    end
-
-    def remove(args, user)
-      network_name, network, user = get_network(args, user)
-      if network
-        Host.all(:conditions => { :network_id => network.id }).each(&:destroy)
-        network.destroy
-        respond "Removed #{network.name} #{show(network.hosts.first) if network.hosts.first}"
+      if opts['network'].present?
+        target = Network.first(:conditions => ["name = ? AND user_id = ?", opts['network'].downcase, user.try(:id)])
+        target ||= Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase]) if self.class.admin_user?(user)
       else
-        respond "Not found"
+        target = network_user.try(:network)
+        if target && target.public? && !self.class.admin_user?(user)
+          raise(Command::ArgumentError, "Only admins can modify public networks")
+        end
+        raise(Command::ArgumentError, "No network found") unless target
       end
-    end
 
-    def attributes(args, user)
-      network_name, network, user = get_network(args, user)
+      uri = ListenCommand.get_uri(args.shift) unless args.empty?
+      addr_args = { :address => uri.host, :port => uri.port, :ssl => (uri.scheme == 'ircs') } if uri
 
-      unless network
-        create_public = !user || (user.admin? && args['public'])
-        network = Network.create(:name => network_name, :user => (create_public ? nil : user))
-        unless create_public
-          NetworkUser.create(:user => user, :network => network)
+      if opts['remove']
+        raise(Command::ArgumentError, "No network found") unless target
+        raise(Command::ArgumentError, "You must explicitly specify the network to remove") unless opts['network']
+        if uri
+          target.hosts.first(:conditions => addr_args).try(:destroy)
+          respond "    #{show(target)}"
+        else
+          target.destroy
+          r "Network #{target.name} removed"
+        end
+      else
+        unless target
+          create_public = (self.class.admin_user?(user) && opts['public'])
+          raise(Command::ArgumentError, "Only public networks can be created without a user") unless create_public || user
+          raise(Command::ArgumentError, "Creating user networks has been disabled by the admins") unless Setting.get('allow_user_networks') == 'true'
+          target = Network.create(:name => opts['network'], :user => (create_public ? nil : user))
+          unless create_public
+            NetworkUser.create(:user => user, :network => target)
+          end
+        end
+
+        target.attributes = { :hosts_attributes => [addr_args] }
+        target.save
+        if target.errors.any?
+          respond "Error:"
+          target.errors.full_messages.each { |m| respond "    #{m}" }
+          respond "    #{show(target)}"
+        else
+          respond("updated:")
+          respond "    #{show(target)}"
         end
       end
-
-      uri = ListenCommand.get_uri(args)
-      { :network => network, :address => uri.host, :port => uri.port, :ssl => (uri.scheme == 'ircs') }
     end
   end
 
   class SettingCommand < Command
-    register 'settings'
-
-    def self.admin_only?
-      true
-    end
+    register 'setting'
 
     def self.setting_resources(name)
       @setting_resources ||= YAML.load_file(File.expand_path("../../../resources/setting_descriptions.yml", __FILE__))
       @setting_resources[name] || {}
     end
 
-    def execute(args, user)
-      rest = args[:rest]
-      case rest.size
+    def execute
+      case args.size
       when 0
         r "Settings:"
         Setting.all.each { |s| r "    #{s}" }
       when 1
-        setting = Setting.find_by_name(rest.first)
+        setting = Setting.find_by_name(args.first)
         if setting
           r(setting.to_s)
           desc = self.class.setting_resources(setting.name)
@@ -381,7 +435,7 @@ class TkellemBot
           r("No setting with that name")
         end
       when 2
-        setting = Setting.set(rest[0], rest[1])
+        setting = Setting.set(args[0], args[1])
         setting ? r(setting.to_s) : r("No setting with that name")
       else
         show_help

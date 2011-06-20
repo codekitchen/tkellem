@@ -1,47 +1,67 @@
 --- 
 LISTEN:
-  banner: "Usage: LISTEN [--add|--remove|--list] <uri>"
+  banner: "Usage: LISTEN [--remove] <uri>"
   help: |+
+
     Manage the address/port combinations for tkellem to accept client
     connections on.
 
     Protocol is either `irc`, or `ircs` for an SSL listener.
 
-    Example:
-        LISTEN --add ircs://0.0.0.0:10001
+    Examples:
+        LISTEN ircs://0.0.0.0:10001
+        LISTEN --remove ircs://0.0.0.0:10001
 
 USER:
-  banner: "Usage: USER [--add|--remove|--list] <username> [--admin]"
+  banner: "Usage: USER [--remove] <username> [--role=<admin|user>]"
   help: |+
+
     Manage users.
 
     Example:
-        USER --add joe admin
+        USER joe --role=admin
+        USER joe --role=user
+        USER --remove joe
 
 PASSWORD:
-  banner: "Usage: PASSWORD [--user <username>] <new-password>"
+  banner: "Usage: PASSWORD <new-password>"
   help: |+
-    Change password. If you are an admin, you can change other users passwords as well.
+
+    Change password.
 
     Example:
         PASSWORD hunter2
 
 NETWORK:
-  banner: "Usage: NETWORK [--add|--remove|--list] [--public] <network-name> <uri>"
+  banner: "Usage: NETWORK [--remove] [--public] [--name=<network-name>] <uri>"
   help: |+
-    Manage networks. --add will add a new network, or a new connection host to an existing network. Public networks can only be created by admins, and can be joined by anybody.
+
+    Manage networks. Will add a new network, or a new connection host to an existing network. Public networks can only be created by admins, and can be joined by anybody.
 
     To connect to a network, change the server username in your irc client to reflect what network you want to connect to, in the form of username@network. For instance, to connect to a network called "freenode" as the user "joe", you would set your username to joe@freenode
 
     Examples:
-        NETWORK --add --public freenode irc://irc.freenode.org:6667
-        NETWORK --add freenode ircs://irc.freenode.org:7000
+        NETWORK ircs://irc.freenode.org:7000 # operate on the current network
+        NETWORK --name=freenode ircs://irc.freenode.org:7000
+        NETWORK --remove --name=freenode ircs://irc.freenode.org:7000
+        NETWORK --remove --name=freenode
 
-SETTINGS:
-  banner: "SETTINGS [<name>] [<new_value>]"
+ATCONNECT:
+  banner: "Usage: ATCONNECT [--remove] <command>"
   help: |+
+
+    Add or remove an IRC command to run at connect.
+
+    Examples:
+        ATCONNECT /join #tkellem
+        ATCONNECT --remove /join #tkellem
+
+SETTING:
+  banner: "SETTING [<name>] [<new_value>]"
+  help: |+
+
     View and modify global settings.
 
     Examples:
-        SETTINGS
-        SETTINGS public_registration true
+        SETTING
+        SETTING public_registration true

@@ -43,11 +43,6 @@ class User < ActiveRecord::Base
     self.password == OpenSSL::Digest::SHA1.hexdigest(password)
   end
 
-  def set_password!(password)
-    self.password = password
-    self.save!
-  end
-
   def password=(password)
     write_attribute(:password, password ? OpenSSL::Digest::SHA1.hexdigest(password) : nil)
   end

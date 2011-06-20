@@ -6,7 +6,8 @@ include Tkellem
 describe BouncerConnection, "connect" do
   before do
     u = User.create(:username => 'speccer')
-    u.set_password!('test123')
+    u.password = 'test123'
+    u.save
     tk = mock(TkellemServer)
     @b = mock(Bouncer)
     tk.should_receive(:find_bouncer).with(u, 'testhost').and_return(@b)

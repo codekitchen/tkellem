@@ -19,7 +19,7 @@ module SocketServer
 
   def receive_line(line)
     trace "admin socket: #{line}"
-    TkellemBot.run_command(line, nil) do |line|
+    TkellemBot.run_command(line, nil, nil) do |line|
       send_data("#{line}\n")
     end
     send_data("\0\n")

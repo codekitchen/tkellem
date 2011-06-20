@@ -14,3 +14,7 @@ recaptcha_api_key:
     <public key>,<private key>
 
     That is, the public key, then a comma, then the private key. This will protect user self-signups behind a recaptcha check.
+
+allow_user_networks:
+  help: |+
+    If 'true', allow users to create their own networks with the `/tkellem network` command. Otherwise, users can only join admin-created public networks.

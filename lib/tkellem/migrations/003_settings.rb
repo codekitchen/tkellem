@@ -8,5 +8,6 @@ class Settings < ActiveRecord::Migration
 
     Tkellem::Setting.make_new('user_registration', 'closed')
     Tkellem::Setting.make_new('recaptcha_api_key', '')
+    Tkellem::Setting.make_new('allow_user_networks', 'false')
   end
 end

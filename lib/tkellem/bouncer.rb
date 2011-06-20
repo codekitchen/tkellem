@@ -8,7 +8,7 @@ module Tkellem
 class Bouncer
   include Tkellem::EasyLogger
 
-  attr_reader :user, :network, :nick
+  attr_reader :user, :network, :nick, :network_user
   cattr_accessor :plugins
   self.plugins = []
 
@@ -173,7 +173,7 @@ class Bouncer
   def connection_established(conn)
     @conn = conn
     # TODO: support sending a real username, realname, etc
-    send_msg("USER #{@user.username} somehost tkellem :#{@user.name}")
+    send_msg("USER #{@user.username} somehost tkellem :#{@user.name}@tkellem")
     change_nick(@nick, true)
     check_away_status
   end
@@ -209,7 +209,9 @@ class Bouncer
     @last_connect = Time.now
     @cur_host = (@cur_host || 0) % hosts.length
     host = hosts[@cur_host]
-    EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
+    failsafe("connect: #{host}") do
+      EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
+    end
   end
 
   def ready!
@@ -222,7 +224,7 @@ class Bouncer
     # We're all initialized, allow connections
     @connected = true
 
-    @network_user.at_connect.each do |line|
+    @network_user.combined_at_connect.each do |line|
       cmd, args = line.split(' ', 2)
       next unless cmd && args && cmd[0] == '/'[0]
       msg = IrcMessage.parse("#{cmd[1..-1].upcase} #{args}")
