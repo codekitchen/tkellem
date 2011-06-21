@@ -97,7 +97,7 @@ module BouncerConnection
       command = msg.command
       if @state != :auth && command == 'PRIVMSG' && msg.args.first == '-tkellem'
         msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
-      elsif command == 'TKELLEM'
+      elsif command == 'TKELLEM' || command == 'TK'
         msg_tkellem(msg)
       elsif command == 'CAP'
         # TODO: full support for CAP -- this just gets mobile colloquy connecting
