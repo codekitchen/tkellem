@@ -34,9 +34,11 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
   # /msg #someroom hey guys
   def self.parse_client_command(line)
     return nil unless line[0] == '/'[0]
+    if line =~ %r{^/msg\s+(\S+)\s+(.*)$}
+      line = "/PRIVMSG #{$1} :#{$2}"
+    end
     msg = parse(line[1..-1])
     return nil unless msg
-    msg.command = 'PRIVMSG' if msg.command == 'MSG'
     msg
   end
 
