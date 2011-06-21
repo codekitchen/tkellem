@@ -39,3 +39,12 @@ Then connect to tkellem with an irc client:
 Note that all config and log files are stored in ~/.tkellem of the user
 you run `tkellem start` as. You also need to run `tkellem admin` as this
 same user, in order to have access to the admin console.
+
+## Upgrading
+
+Upgrading is as simple as:
+
+    $ gem install tkellem
+    $ tkellem restart
+
+All active clients will be forced to re-connect.

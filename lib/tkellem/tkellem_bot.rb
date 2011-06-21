@@ -316,9 +316,9 @@ class TkellemBot
         line = args.join(' ')
         raise(Command::ArgumentError, "atconnect commands must start with a /") unless line[0] == '/'[0]
         if opts['remove']
-          target.at_connect = target.at_connect.reject { |l| l == line }
+          target.at_connect = (target.at_connect || []).reject { |l| l == line }
         else
-          target.at_connect = target.at_connect + [line]
+          target.at_connect = (target.at_connect || []) + [line]
         end
         target.save
         r "At connect commands modified:"

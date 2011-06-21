@@ -28,6 +28,18 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
     msg
   end
 
+  # parse a command as it'd come from a client, e.g.
+  # /nick newnick
+  #   or
+  # /msg #someroom hey guys
+  def self.parse_client_command(line)
+    return nil unless line[0] == '/'[0]
+    msg = parse(line[1..-1])
+    return nil unless msg
+    msg.command = 'PRIVMSG' if msg.command == 'MSG'
+    msg
+  end
+
   def ctcp?
     self.ctcp.present?
   end

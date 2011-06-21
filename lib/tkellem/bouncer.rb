@@ -227,10 +227,8 @@ class Bouncer
     @connected = true
 
     @network_user.combined_at_connect.each do |line|
-      cmd, args = line.split(' ', 2)
-      next unless cmd && args && cmd[0] == '/'[0]
-      msg = IrcMessage.parse("#{cmd[1..-1].upcase} #{args}")
-      send_msg(msg)
+      msg = IrcMessage.parse_client_command(line)
+      send_msg(msg) if msg
     end
 
     @waiting_clients.each do |client|
