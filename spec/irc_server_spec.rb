@@ -14,7 +14,7 @@ describe Bouncer, "connection" do
   end
 
   def send_welcome(s, &just_before_last)
-    s.should_receive(:send_msg).with("USER speccer somehost tkellem :speccer")
+    s.should_receive(:send_msg).with("USER speccer somehost tkellem :speccer@tkellem")
     s.should_receive(:send_msg).with("NICK speccer")
     s.should_receive(:send_msg).with("AWAY :Away")
     s.connection_established(nil)
@@ -35,9 +35,8 @@ describe Bouncer, "connection" do
   it "should connect to the server on creation" do
     s = make_server
     s.connected?.should_not be_true
-    s.should_receive(:send_msg).with("USER speccer somehost tkellem :speccer")
+    s.should_receive(:send_msg).with("USER speccer somehost tkellem :speccer@tkellem")
     s.should_receive(:send_msg).with("NICK speccer")
-    s.should_receive(:send_msg).with("AWAY :Away")
     s.connection_established(nil)
   end
 

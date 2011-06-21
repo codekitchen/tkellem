@@ -18,8 +18,9 @@ module BouncerConnection
     @state = :auth
     @name = 'new-conn'
     @data = {}
+    @connected_at = Time.now
   end
-  attr_reader :ssl, :bouncer, :name, :device_name, :connecting_nick
+  attr_reader :ssl, :bouncer, :name, :device_name, :connecting_nick, :connected_at
   alias_method :log_name, :name
 
   def nick

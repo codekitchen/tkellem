@@ -32,6 +32,7 @@ class TkellemServer
   def initialize
     @listeners = {}
     @bouncers = {}
+    $tkellem_server = self
 
     ListenAddress.all.each { |a| listen(a) }
     NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }

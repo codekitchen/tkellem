@@ -442,6 +442,21 @@ class TkellemBot
       end
     end
   end
+
+  class ConnectionsCommand < Command
+    register 'connections'
+
+    def execute
+      require 'socket'
+      $tkellem_server.bouncers.each do |k, bouncer|
+        respond "#{bouncer.user.username}@#{bouncer.network.name} (#{bouncer.connected? ? 'connected' : 'connecting'}) #{"since #{bouncer.connected_at}" if bouncer.connected?}"
+        bouncer.active_conns.each do |conn|
+          port, addr = Socket.unpack_sockaddr_in(conn.get_peername)
+          respond "    #{addr} device=#{conn.device_name} since #{conn.connected_at}"
+        end
+      end
+    end
+  end
 end
 
 end

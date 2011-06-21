@@ -8,7 +8,7 @@ module Tkellem
 class Bouncer
   include Tkellem::EasyLogger
 
-  attr_reader :user, :network, :nick, :network_user
+  attr_reader :user, :network, :nick, :network_user, :connected_at
   cattr_accessor :plugins
   self.plugins = []
 
@@ -175,13 +175,14 @@ class Bouncer
     # TODO: support sending a real username, realname, etc
     send_msg("USER #{@user.username} somehost tkellem :#{@user.name}@tkellem")
     change_nick(@nick, true)
-    check_away_status
+    @connected_at = Time.now
   end
 
   def disconnected!
     debug "OMG we got disconnected."
     @conn = nil
     @connected = false
+    @connected_at = nil
     @active_conns.each { |c,s| c.unbind }
     connect!
   end
@@ -215,13 +216,14 @@ class Bouncer
   end
 
   def ready!
-    return if @joined_rooms
-    @joined_rooms = true
     @rooms.each do |room|
       send_msg("JOIN #{room}")
     end
 
+    check_away_status
+
     # We're all initialized, allow connections
+    @connected_at = Time.now
     @connected = true
 
     @network_user.combined_at_connect.each do |line|
