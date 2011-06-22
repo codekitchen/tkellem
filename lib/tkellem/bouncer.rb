@@ -183,7 +183,7 @@ class Bouncer
     @conn = nil
     @connected = false
     @connected_at = nil
-    @active_conns.each { |c,s| c.unbind }
+    @active_conns.each { |c,s| c.close_connection }
     connect!
   end
 
@@ -200,19 +200,8 @@ class Bouncer
   end
 
   def connect!
-    span = @last_connect ? Time.now - @last_connect : 1000
-    hosts = @network.hosts(true).map { |h| h }
-
-    if span < 5 || hosts.length < 1
-      EM.add_timer(5) { connect! }
-      return
-    end
-    @last_connect = Time.now
-    @cur_host = (@cur_host || 0) % hosts.length
-    host = hosts[@cur_host]
-    failsafe("connect: #{host}") do
-      EM.connect(host.address, host.port, IrcServerConnection, self, host.ssl)
-    end
+    @connector ||= IrcServerConnection.connector(self, network)
+    @connector.connect!
   end
 
   def ready!
