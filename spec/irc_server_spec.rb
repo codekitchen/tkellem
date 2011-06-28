@@ -9,7 +9,8 @@ describe Bouncer, "connection" do
   end
 
   def make_server
-    b = Bouncer.new(NetworkUser.new(:user => User.new(:username => 'speccer'), :network => Network.new))
+    network = Network.create!(:hosts => [Host.create!(:address => 'localhost', :port => 4321)], :name => 'test')
+    b = Bouncer.new(NetworkUser.create!(:user => User.new(:username => 'speccer'), :network => network))
     b
   end
 
@@ -66,7 +67,7 @@ describe Bouncer, "connection" do
     network_user
     @bouncer = $tk_server.bouncers.values.last
     if opts[:connect]
-      @server_conn = em(IrcServerConnection).new(@bouncer, false)
+      @server_conn = em(IrcServerConnection).new(nil, @bouncer, false)
       @server_conn.stub!(:send_data)
       @bouncer.connection_established(@server_conn)
       @bouncer.send :ready!
@@ -96,7 +97,7 @@ describe Bouncer, "connection" do
   it "should attempt another nick if the default is taken" do
     network_user(:nick => 'mynick')
     bouncer
-    @server_conn = em(IrcServerConnection).new(@bouncer, false)
+    @server_conn = em(IrcServerConnection).new(nil, @bouncer, false)
     @server_conn.stub!(:send_data)
     @bouncer.connection_established(@server_conn)
     @server_conn.should_receive(:send_data).with("NICK mynick_\r\n")

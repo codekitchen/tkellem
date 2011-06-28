@@ -22,6 +22,14 @@ describe IrcMessage, ".parse" do
     line.replay.should == orig
   end
 
+  it "should parse and replay messages with leading colons" do
+    orig = "MSG #myroom ::)"
+    line = IrcMessage.parse(orig)
+    line.command.should == "MSG"
+    line.args.should == ["#myroom", ":)"]
+    line.replay.should == orig
+  end
+
   it "should parse with no arguments" do
     line = IrcMessage.parse("AWAY")
     line.command.should == "AWAY"
