@@ -1,5 +1,6 @@
 require 'eventmachine'
-require 'json'
+require 'active_support/json'
+require 'active_support/ordered_hash'
 require 'tkellem/irc_message'
 
 module Tkellem

@@ -1,4 +1,4 @@
 source "http://rubygems.org"
 
-# Specify your gem's dependencies in ruby-protocol-buffers.gemspec
+# Specify your gem's dependencies in tkellem.gemspec
 gemspec
