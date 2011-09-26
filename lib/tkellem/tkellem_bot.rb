@@ -258,7 +258,7 @@ class TkellemBot
 
       if opts['username']
         if Command.admin_user?(user)
-          user = User.first(:conditions => { :username => args['username'] })
+          user = User.first(:conditions => { :username => opts['username'] })
         else
           raise Command::ArgumentError, "Only admins can change other passwords"
         end
