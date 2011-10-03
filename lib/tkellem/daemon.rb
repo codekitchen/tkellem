@@ -15,7 +15,7 @@ class Tkellem::Daemon
   end
 
   def run
-    OptionParser.new do |opts|
+    opts = OptionParser.new do |opts|
       opts.banner = "Usage #{$0} <command> <options>"
       opts.separator %{\nWhere <command> is one of:
   start      start the jobs daemon
@@ -29,7 +29,8 @@ class Tkellem::Daemon
       opts.separator "\n<options>"
       opts.on("-p", "--path", "Use alternate folder for tkellem data (default #{options[:path]})") { |p| options[:path] = p }
       opts.on_tail("-h", "--help", "Show this message") { puts opts; exit }
-    end.parse!(@args)
+    end
+    opts.parse!(@args)
 
     FileUtils.mkdir_p(path)
     File.chmod(0700, path)
@@ -50,6 +51,8 @@ class Tkellem::Daemon
       start
     when 'admin'
       admin
+    when nil
+      puts opts
     else
       raise("Unknown command: #{command.inspect}")
     end
