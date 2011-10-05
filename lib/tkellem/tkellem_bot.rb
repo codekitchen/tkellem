@@ -340,7 +340,7 @@ class TkellemBot
 
     def list
       public_networks = Network.all(:conditions => 'user_id IS NULL')
-      user_networks = user.reload.try(:networks) || []
+      user_networks = user.try(:reload).try(:networks) || []
       if user_networks.present? && public_networks.present?
         r "Public networks are prefixed with [P], user-specific networks with [U]."
       end
