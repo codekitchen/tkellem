@@ -4,6 +4,7 @@ require 'time'
 require 'active_support/core_ext/class/attribute_accessors'
 
 require 'tkellem/irc_message'
+require 'tkellem/tkellem_bot'
 
 module Tkellem
 
@@ -162,6 +163,42 @@ class Backlog
       return timestamp, msg
     else
       nil
+    end
+  end
+end
+
+class TkellemBot
+  class Search < Command
+    register 'search'
+
+    def execute(args, bouncer)
+      ctx = args[:rest].shift
+      query = args[:rest].join " "
+
+      unless ctx.present? && query.present?
+        r "Please specify a #room and a string to search for."
+        return
+      end
+
+      backlog = Backlog.get_instance(bouncer)
+
+      filename = backlog.stream_filename(ctx)
+      unless File.exists?(filename)
+        r "Can't find backlog for #{ctx}."
+        return
+      end
+
+      r "Searching #{ctx} for \"#{query}\""
+
+      # TODO: implement a smarter, reverse search, as this can be expensive on very long backlogs.
+      # TODO: keep some state after a search and let the user get context around one of the results.
+      result = %x{grep #{query.shellescape} #{filename} | tail -n 10}
+      if result.empty?
+        r "No results. Sorry."
+      else
+        r "Results:"
+        r result
+      end
     end
   end
 end

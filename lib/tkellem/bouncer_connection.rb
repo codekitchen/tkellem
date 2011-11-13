@@ -56,7 +56,7 @@ module BouncerConnection
   end
 
   def msg_tkellem(msg)
-    TkellemBot.run_command(msg.args.join(' '), @user) do |response|
+    TkellemBot.run_command(msg.args.join(' '), @bouncer) do |response|
       say_as_tkellem(response)
     end
   end

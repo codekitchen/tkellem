@@ -6,7 +6,7 @@ module Tkellem
 class TkellemBot
   # careful here -- if no user is given, it's assumed the command is running as
   # an admin
-  def self.run_command(line, user, &block)
+  def self.run_command(line, bouncer, &block)
     args = Shellwords.shellwords(line.downcase)
     command_name = args.shift.upcase
     command = commands[command_name]
@@ -16,7 +16,7 @@ class TkellemBot
       return
     end
 
-    command.run(args, user, block)
+    command.run(args, bouncer, block)
   end
 
   class Command
@@ -58,7 +58,8 @@ class TkellemBot
       false
     end
 
-    def self.run(args_arr, user, block)
+    def self.run(args_arr, bouncer, block)
+      user = bouncer.user
       if admin_only? && !admin_user?(user)
         block.call "You can only run #{name} as an admin."
         return
@@ -67,7 +68,7 @@ class TkellemBot
       options.cmd = cmd
       options.parse!(args_arr)
       cmd.args[:rest] = args_arr
-      cmd.execute(cmd.args, user)
+      cmd.execute(cmd.args, bouncer)
     rescue ArgumentError => e
       cmd.respond e.to_s
       cmd.show_help
@@ -98,7 +99,7 @@ class TkellemBot
   class Help < Command
     register 'help'
 
-    def execute(args, user)
+    def execute(args, bouncer)
       name = args[:rest].first
       r "**** tkellem help ****"
       if name.nil?
@@ -108,7 +109,7 @@ class TkellemBot
         r "The following commands are available:"
         TkellemBot.commands.keys.sort.each do |name|
           command = TkellemBot.commands[name]
-          next if command.admin_only? && user && !user.admin?
+          next if command.admin_only? && bouncer && bouncer.user && !bouncer.user.admin?
           r "#{name}#{' ' * (25-name.length)}"
         end
       elsif (command = TkellemBot.commands[name.upcase])
@@ -165,13 +166,13 @@ class TkellemBot
       end
     end
 
-    def execute(args, user)
+    def execute(args, bouncer)
       if args['list']
-        list(args, user)
+        list(args, bouncer.user)
       elsif args['remove']
-        remove(args, user)
+        remove(args, bouncer.user)
       elsif args['add']
-        add(args, user)
+        add(args, bouncer.user)
       else
         raise Command::ArgumentError, "Unknown sub-command"
       end
@@ -230,7 +231,8 @@ class TkellemBot
 
     options.set('username', '--user=username', '-u', 'Change password for other username')
 
-    def execute(args, user)
+    def execute(args, bouncer)
+      user = bouncer.user
       if args['username']
         if Command.admin_user?(user)
           user = User.first(:conditions => { :username => args['username'] })
