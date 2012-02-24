@@ -47,6 +47,14 @@ describe Bouncer, "connection" do
     s.server_msg(IrcMessage.parse(":speccer!test@host ping :HAI"))
   end
 
+  it "should ignore blank lines" do
+    b = mock("bouncer", :trace => nil)
+    b.should_receive(:failsafe).and_yield
+    s = em(IrcServerConnection).new('connected', b, false)
+    b.should_receive(:server_msg).never
+    s.receive_line("")
+  end
+
   def tk_server
     $tk_server ||= TkellemServer.new
   end

@@ -40,6 +40,7 @@ module IrcServerConnection
   def receive_line(line)
     @bouncer.failsafe(:receive_line) do
       @bouncer.trace "from server: #{line}"
+      return if line.blank?
       msg = IrcMessage.parse(line)
       @bouncer.server_msg(msg)
     end

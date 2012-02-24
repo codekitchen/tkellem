@@ -92,6 +92,7 @@ module BouncerConnection
   def receive_line(line)
     failsafe("message: {#{line}}") do
       trace "from client: #{line}"
+      return if line.blank?
       msg = IrcMessage.parse(line)
 
       command = msg.command
