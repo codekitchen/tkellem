@@ -389,7 +389,8 @@ class TkellemBot
         unless target
           create_public = (self.class.admin_user?(user) && opts['public'])
           raise(Command::ArgumentError, "Only public networks can be created without a user") unless create_public || user
-          raise(Command::ArgumentError, "Creating user networks has been disabled by the admins") unless Setting.get('allow_user_networks') == 'true'
+          admin_or_user_networks = self.class.admin_user?(user) || Setting.get('allow_user_networks') == 'true'
+          raise(Command::ArgumentError, "Creating user networks has been disabled by the admins") unless admin_or_user_networks
           target = Network.create(:name => opts['network'], :user => (create_public ? nil : user))
           unless create_public
             NetworkUser.create(:user => user, :network => target)
