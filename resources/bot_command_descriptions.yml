@@ -64,4 +64,4 @@ SETTING:
 
     Examples:
         SETTING
-        SETTING public_registration true
+        SETTING user_registration open
