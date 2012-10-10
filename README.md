@@ -40,6 +40,19 @@ Note that all config and log files are stored in ~/.tkellem of the user
 you run `tkellem start` as. You also need to run `tkellem admin` as this
 same user, in order to have access to the admin console.
 
+## Devices
+
+Each user can connect with multiple devices. Devices are specified in your
+login by appending `:<device-name>` to your login. Example:
+
+    login: <my-name>@freenode:work-machine
+
+If there is no `:<device-name>` appended to your login, tkellem just uses a
+default device.
+
+Using multiple devices simply marks separate points in the backlog so you
+get only the relevant backlog on a per-device basis.
+
 ## Upgrading
 
 Upgrading is as simple as:
