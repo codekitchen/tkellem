@@ -1,46 +1,60 @@
-require 'eventmachine'
-require 'active_record'
+require 'active_support/core_ext'
+require 'celluloid'
+require 'sequel'
 
-require 'tkellem/bouncer_connection'
 require 'tkellem/bouncer'
-
-require 'tkellem/models/host'
-require 'tkellem/models/listen_address'
-require 'tkellem/models/network'
-require 'tkellem/models/network_user'
-require 'tkellem/models/setting'
-require 'tkellem/models/user'
+require 'tkellem/bouncer_connection'
+require 'tkellem/celluloid_tools'
 
 require 'tkellem/plugins/backlog'
-require 'tkellem/plugins/push_service'
+#require 'tkellem/plugins/push_service'
 
 module Tkellem
 
 class TkellemServer
   include Tkellem::EasyLogger
 
-  attr_reader :bouncers
+  attr_reader :bouncers, :options
 
-  def initialize
-    @listeners = {}
+  def self.initialize_database(path)
+    Sequel.extension :migration
+    db = Sequel.connect({
+      :adapter => 'sqlite',
+      :database => path,
+    })
+    migrations_path = File.expand_path("../migrations", __FILE__)
+    Sequel::Migrator.apply(db, migrations_path)
+
+    Sequel::Model.raise_on_save_failure = true
+    # Can't load the models until we've connected to the database and migrated
+    require 'tkellem/models/host'
+    require 'tkellem/models/listen_address'
+    require 'tkellem/models/network'
+    require 'tkellem/models/network_user'
+    require 'tkellem/models/setting'
+    require 'tkellem/models/user'
+
+    db
+  end
+
+  def initialize(options)
+    @options = options
+    @listeners = Celluloid::SupervisionGroup.new
     @bouncers = {}
     $tkellem_server = self
 
-    unless ActiveRecord::Base.connected?
-      ActiveRecord::Base.establish_connection({
-        :adapter => 'sqlite3',
-        :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
-      })
-      ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
-    end
-
-    ListenAddress.all.each { |a| listen(a) }
-    NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }
-    Observer.forward_to << self
+    @db = self.class.initialize_database(db_file)
   end
 
-  def stop
-    Observer.forward_to.delete(self)
+  def run
+    start_unix_server
+    ListenAddress.all { |a| listen(a) }
+    NetworkUser.all { |nu| add_bouncer(Bouncer.new(nu)) }
+
+    begin
+      sleep 1 while @listeners.alive?
+    rescue Interrupt
+    end
   end
 
   # callbacks for AR observer events
@@ -61,18 +75,27 @@ class TkellemServer
     end
   end
 
-  def listen(listen_address)
-    address = listen_address.address
-    port = listen_address.port
-    ssl = listen_address.ssl
+  def start_unix_server
+    # This file relies on the models being loaded
+    # TODO: this is gross
+    require 'tkellem/socket_server'
+    CelluloidTools::UnixListener.start(socket_file) do |socket|
+      SocketServer.new(socket)
+    end
+  end
 
+  def listen(listen_address)
     info "Listening on #{listen_address}"
 
-    @listeners[listen_address.id] = EM.start_server(listen_address.address,
-                                                    listen_address.port,
-                                                    BouncerConnection,
-                                                    self,
-                                                    listen_address.ssl)
+    if listen_address.ssl
+      error "SSL listeners not yet supported"
+      return
+    end
+
+    CelluloidTools::TCPListener.start(listen_address.address,
+                                      listen_address.port) do |socket|
+      BouncerConnection.new(self, socket).run!
+    end
   end
 
   def stop_listening(listen_address)
@@ -95,7 +118,7 @@ class TkellemServer
       # find the public network with this name, and attempt to auto-add this user to it
       network = Network.first(:conditions => { :user_id => nil, :name => network_name })
       if network
-        nu = NetworkUser.create!(:user => user, :network => network)
+        NetworkUser.create!(:user => user, :network => network)
         # AR callback should create the bouncer in sync
         bouncer = @bouncers[key]
       end
@@ -103,22 +126,13 @@ class TkellemServer
     bouncer
   end
 
-  class Observer < ActiveRecord::Observer
-    observe 'Tkellem::ListenAddress', 'Tkellem::NetworkUser'
-    cattr_accessor :forward_to
-    self.forward_to = []
-
-    def after_create(obj)
-      forward_to.each { |f| f.after_create(obj) }
-    end
-
-    def after_destroy(obj)
-      forward_to.each { |f| f.after_destroy(obj) }
-    end
+  def socket_file
+    File.join(options[:path], 'tkellem.socket')
   end
 
-  ActiveRecord::Base.observers = Observer
-  ActiveRecord::Base.instantiate_observers
+  def db_file
+    File.join(options[:path], 'tkellem.sqlite3')
+  end
 end
 
 end

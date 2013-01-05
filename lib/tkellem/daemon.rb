@@ -2,7 +2,6 @@ require 'fileutils'
 require 'optparse'
 
 require 'tkellem'
-require 'tkellem/socket_server'
 
 class Tkellem::Daemon
   attr_reader :options
@@ -86,11 +85,8 @@ class Tkellem::Daemon
   end
 
   def start
-    trap("INT") { EM.stop }
-    EM.run do
-      @admin = EM.start_unix_domain_server(socket_file, Tkellem::SocketServer)
-      Tkellem::TkellemServer.new
-    end
+    remove_files
+    Tkellem::TkellemServer.new(options).run
   ensure
     remove_files
   end
@@ -138,7 +134,7 @@ class Tkellem::Daemon
   end
 
   def remove_files
-    FileUtils.rm(socket_file)
+    FileUtils.rm(socket_file) if File.exist?(socket_file)
     return unless @daemon
     pid = File.read(pid_file) if File.file?(pid_file)
     if pid.to_i == Process.pid

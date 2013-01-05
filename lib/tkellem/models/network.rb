@@ -1,20 +1,24 @@
 module Tkellem
 
-class Network < ActiveRecord::Base
-  has_many :hosts, :dependent => :destroy
-  accepts_nested_attributes_for :hosts
+class Network < Sequel::Model
+  plugin :nested_attributes
+  plugin :validation_class_methods
+  plugin :serialization
 
-  has_many :network_users, :dependent => :destroy
+  one_to_many :hosts, :dependent => :destroy
+  nested_attributes :hosts
+
+  one_to_many :network_users, :dependent => :destroy
   # networks either belong to a specific user, or they are public and any user
   # can join them.
-  belongs_to :user
+  many_to_one :user
 
   validates_uniqueness_of :name, :scope => :user_id
 
-  serialize :at_connect, Array
+  serialize_attributes :yaml, :at_connect
 
   def at_connect
-    read_attribute(:at_connect) || []
+    super || []
   end
 
   def public?

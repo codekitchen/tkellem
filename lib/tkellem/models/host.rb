@@ -1,7 +1,7 @@
 module Tkellem
 
-class Host < ActiveRecord::Base
-  belongs_to :network
+class Host < Sequel::Model
+  many_to_one :network
 
   def to_s
     self.class.address_string(address, port, ssl)

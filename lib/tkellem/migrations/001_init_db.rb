@@ -1,33 +1,50 @@
-class InitDb < ActiveRecord::Migration
-  def self.up
-    create_table 'listen_addresses' do |t|
-      t.string  'address', :null => false
-      t.integer 'port', :null => false
-      t.boolean 'ssl', :null => false, :default => false
+Sequel.migration do
+  up do
+    if self.table_exists?(:schema_migrations) && self[:schema_migrations].first(:version => '1')
+      next
     end
 
-    create_table 'users' do |t|
-      t.string 'username', :null => false
-      t.string 'password'
-      t.string 'role', :null => false, :default => 'user'
+    create_table 'listen_addresses' do
+      primary_key :id
+      String  'address', :null => false
+      Integer 'port', :null => false
+      boolean 'ssl', :null => false, :default => false
     end
 
-    create_table 'networks' do |t|
-      t.belongs_to 'user'
-      t.string 'name', :null => false
+    create_table 'users' do
+      primary_key :id
+      String 'username', :null => false
+      String 'password'
+      String 'role', :null => false, :default => 'user'
     end
 
-    create_table 'hosts' do |t|
-      t.belongs_to 'network'
-      t.string  'address', :null => false
-      t.integer 'port', :null => false
-      t.boolean 'ssl', :null => false, :default => false
+    create_table 'networks' do
+      primary_key :id
+      foreign_key :user_id, :users
+      String 'name', :null => false
     end
 
-    create_table 'network_users' do |t|
-      t.belongs_to 'user'
-      t.belongs_to 'network'
-      t.string 'nick'
+    create_table 'hosts' do
+      primary_key :id
+      foreign_key :network_id, :networks
+      String  'address', :null => false
+      Integer 'port', :null => false
+      boolean 'ssl', :null => false, :default => false
     end
+
+    create_table 'network_users' do
+      primary_key :id
+      foreign_key :user_id, :users
+      foreign_key :network_id, :networks
+      String 'nick'
+    end
+  end
+
+  down do
+    drop_table 'network_users'
+    drop_table 'hosts'
+    drop_table 'networks'
+    drop_table 'users'
+    drop_table 'listen_addresses'
   end
 end

@@ -1,6 +1,6 @@
 module Tkellem
 
-class Setting < ActiveRecord::Base
+class Setting < Sequel::Model
   def self.get(setting_name)
     setting = first(:conditions => { :name => setting_name })
     setting.try(:value)

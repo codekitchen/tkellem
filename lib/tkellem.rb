@@ -21,7 +21,7 @@ module Tkellem
       @trace = val
     end
     def self.trace
-      @trace || @trace = false
+      @trace || @trace = true
     end
 
     def log_name
@@ -30,15 +30,6 @@ module Tkellem
 
     def trace(msg)
       puts("TRACE: #{log_name}: #{msg}") if EasyLogger.trace
-    end
-
-    def failsafe(event)
-      yield
-    rescue => e
-      # if the failsafe rescue fails, we're in a really bad state and should probably just die
-      self.error "exception while handling #{event}"
-      self.error e.to_s
-      (e.backtrace || []).each { |line| self.error line }
     end
 
     ::Logger::Severity.constants.each do |level|

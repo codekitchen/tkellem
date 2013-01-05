@@ -156,7 +156,7 @@ class TkellemBot
     end
 
     def modify
-      instance = model.first(:conditions => find_attributes)
+      instance = model.first(find_attributes)
       new_record = false
       if instance
         instance.attributes = attributes
@@ -181,7 +181,7 @@ class TkellemBot
     end
 
     def remove
-      instance = model.first(:conditions => find_attributes)
+      instance = model.first(find_attributes)
       if instance
         instance.destroy
         respond "Removed #{show(instance)}"

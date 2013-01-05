@@ -1,12 +1,14 @@
 require 'active_support/core_ext/class/attribute_accessors'
+require 'celluloid/io'
 
-require 'tkellem/irc_server'
 require 'tkellem/bouncer_connection'
 
 module Tkellem
 
 class Bouncer
+  include Celluloid::IO
   include Tkellem::EasyLogger
+  include Tkellem::CelluloidTools::LineReader
 
   attr_reader :user, :network, :nick, :network_user, :connected_at
   cattr_accessor :plugins
@@ -100,6 +102,13 @@ class Bouncer
     end
   end
 
+  def receive_line(line)
+    trace "from server: #{line}"
+    return if line.blank?
+    msg = IrcMessage.parse(line)
+    server_msg(msg)
+  end
+
   def server_msg(msg)
     return if plugins.any? do |plugin|
       !plugin.server_msg(self, msg)
@@ -165,22 +174,21 @@ class Bouncer
   alias_method :log_name, :name
 
   def send_msg(msg)
-    return unless @conn
     trace "to server: #{msg}"
-    @conn.send_data("#{msg}\r\n")
+    @socket.write("#{msg}\r\n")
   end
 
-  def connection_established(conn)
-    @conn = conn
+  def connection_established
+    debug "Connected"
     # TODO: support sending a real username, realname, etc
     send_msg("USER #{@user.username} somehost tkellem :#{@user.name}@tkellem")
     change_nick(@nick, true)
     @connected_at = Time.now
+    run!
   end
 
   def disconnected!
     debug "OMG we got disconnected."
-    @conn = nil
     @connected = false
     @connected_at = nil
     @active_conns.each { |c,s| c.close_connection }
@@ -200,8 +208,20 @@ class Bouncer
   end
 
   def connect!
-    @connector ||= IrcServerConnection.connector(self, network)
-    @connector.connect!
+    hosts = network.reload.hosts
+    # random rather than round-robin, not totally ideal
+    # Note: Celluloid::TCPSocket also is random rather than round-robin when
+    # picking the DNS IP record to connect to
+    host = hosts[rand(hosts.length)]
+    begin
+      info "Connecting to #{host}"
+      @socket = TCPSocket.new(host.address, host.port)
+      if host.ssl
+        @socket = SSLSocket.new(@socket)
+        @socket.connect
+      end
+    end
+    connection_established
   end
 
   def ready!

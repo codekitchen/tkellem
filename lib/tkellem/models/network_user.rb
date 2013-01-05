@@ -1,17 +1,28 @@
 module Tkellem
 
-class NetworkUser < ActiveRecord::Base
-  belongs_to :network
-  belongs_to :user
+class NetworkUser < Sequel::Model
+  plugin :serialization
 
-  serialize :at_connect, Array
+  many_to_one :network
+  many_to_one :user
+
+  serialize_attributes :yaml, :at_connect
+
+  def at_connect
+    super || []
+  end
 
   def nick
-    read_attribute(:nick) || user.name
+    super || user.name
   end
 
   def combined_at_connect
-    network.at_connect + (at_connect || [])
+    network.at_connect + at_connect
+  end
+
+  def after_create
+    super
+    $tkellem_server.try(:after_create, self)
   end
 end
 
