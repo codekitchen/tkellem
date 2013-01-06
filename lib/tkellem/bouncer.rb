@@ -111,12 +111,12 @@ class Bouncer
       ready! if msg.command == "376" # end of MOTD
       false
     when 'JOIN'
-      debug "#{msg.target_user} joined #{msg.args.last}"
-      @rooms << msg.args.last if msg.target_user == @nick
+      debug "#{msg.target_user} joined #{msg.args.first}"
+      @rooms << msg.args.first if msg.target_user == @nick
       true
     when 'PART'
-      debug "#{msg.target_user} left #{msg.args.last}"
-      @rooms.delete(msg.args.last) if msg.target_user == @nick
+      debug "#{msg.target_user} left #{msg.args.first}"
+      @rooms.delete(msg.args.first) if msg.target_user == @nick
       true
     when 'PING'
       send_msg("PONG tkellem!tkellem :#{msg.args.last}")
