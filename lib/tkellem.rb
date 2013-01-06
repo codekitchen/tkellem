@@ -21,7 +21,7 @@ module Tkellem
       @trace = val
     end
     def self.trace
-      @trace || @trace = true
+      @trace || @trace = false
     end
 
     def log_name

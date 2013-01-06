@@ -38,8 +38,9 @@ class TkellemServer
   end
 
   def initialize(options)
+    Celluloid.logger = Tkellem::EasyLogger.logger
     @options = options
-    @listeners = Celluloid::SupervisionGroup.new
+    @listeners = {}
     @bouncers = {}
     $tkellem_server = self
 
@@ -52,7 +53,7 @@ class TkellemServer
     NetworkUser.all { |nu| add_bouncer(Bouncer.new(nu)) }
 
     begin
-      sleep 1 while @listeners.alive?
+      sleep
     rescue Interrupt
     end
   end
@@ -84,24 +85,29 @@ class TkellemServer
     end
   end
 
+  def ssl_ctx
+    @ssl_ctx ||= CelluloidTools.generate_ssl_ctx
+  end
+
   def listen(listen_address)
     info "Listening on #{listen_address}"
 
-    if listen_address.ssl
-      error "SSL listeners not yet supported"
-      return
-    end
-
-    CelluloidTools::TCPListener.start(listen_address.address,
-                                      listen_address.port) do |socket|
+    listener = CelluloidTools::TCPListener.start(listen_address.address,
+                                                 listen_address.port) do |socket|
+      if listen_address.ssl
+        socket = Celluloid::IO::SSLSocket.new(socket, ssl_ctx)
+        socket.accept
+      end
       BouncerConnection.new(self, socket).run!
     end
+
+    @listeners[listen_address.id] = listener
   end
 
   def stop_listening(listen_address)
     listener = @listeners[listen_address.id]
     return unless listener
-    EM.stop_server(listener)
+    listener.terminate
     info "No longer listening on #{listen_address}"
   end
 
@@ -116,9 +122,9 @@ class TkellemServer
     bouncer = @bouncers[key]
     if !bouncer
       # find the public network with this name, and attempt to auto-add this user to it
-      network = Network.first(:conditions => { :user_id => nil, :name => network_name })
+      network = Network.first({ :user_id => nil, :name => network_name })
       if network
-        NetworkUser.create!(:user => user, :network => network)
+        NetworkUser.create(:user => user, :network => network)
         # AR callback should create the bouncer in sync
         bouncer = @bouncers[key]
       end

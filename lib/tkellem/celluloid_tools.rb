@@ -1,5 +1,45 @@
+require 'openssl'
+require 'celluloid/io'
+
 module Tkellem
 module CelluloidTools
+
+# Generates a new SSL context with a new cert and key
+# Great for easily getting up and running, but not necessarily a good idea for
+# production use
+def self.generate_ssl_ctx
+  key = OpenSSL::PKey::RSA.new(2048)
+
+  dn = OpenSSL::X509::Name.parse("/CN=tkellem-auto")
+  cert = OpenSSL::X509::Certificate.new
+  cert.version = 2
+  cert.serial = 1
+  cert.subject = dn
+  cert.issuer = dn
+  cert.public_key = key.public_key
+  cert.not_before = Time.now
+  cert.not_after = Time.now + 94670777 # 3 years
+  cert.sign(key, OpenSSL::Digest::SHA1.new)
+
+  ctx = OpenSSL::SSL::SSLContext.new
+  ctx.key = key
+  ctx.cert = cert
+
+  ctx
+end
+
+# MONKEY PUNCH
+class ::Celluloid::IO::SSLSocket
+  def accept
+    to_io.accept_nonblock
+  rescue ::IO::WaitReadable
+    wait_readable
+    retry
+  rescue ::IO::WaitWritable
+    wait_writable
+    retry
+  end
+end
 
 class Listener < Struct.new(:server, :callback)
   include Celluloid::IO
@@ -67,7 +107,7 @@ module LineReader
       line = readline
       receive_line(line)
     end
-  rescue EOFError, IOError
+  rescue EOFError, IOError, OpenSSL::SSL::SSLError
     unbind
   end
 
