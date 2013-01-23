@@ -207,7 +207,7 @@ class Bouncer
     @welcomes.each { |msg| msg.args[0] = nick; bouncer_conn.send_msg(msg) }
   end
 
-  def connect!
+  def connect
     hosts = network.reload.hosts
     # random rather than round-robin, not totally ideal
     # Note: Celluloid::TCPSocket also is random rather than round-robin when

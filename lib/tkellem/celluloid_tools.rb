@@ -41,6 +41,22 @@ class ::Celluloid::IO::SSLSocket
   end
 end
 
+class BackoffSupervisor < ::Celluloid::SupervisionGroup
+  attr_reader :registry
+
+  def restart_actor(actor, reason)
+    member = @members.find do |member|
+      member.actor == actor
+    end
+    raise "a group member went missing. This shouldn't be!" unless member
+
+    if reason
+    end
+
+    member.restart(reason)
+  end
+end
+
 class Listener < Struct.new(:server, :callback)
   include Celluloid::IO
 

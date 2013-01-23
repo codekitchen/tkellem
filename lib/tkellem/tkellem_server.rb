@@ -12,6 +12,7 @@ require 'tkellem/plugins/backlog'
 module Tkellem
 
 class TkellemServer
+  include Celluloid
   include Tkellem::EasyLogger
 
   attr_reader :bouncers, :options
@@ -41,7 +42,7 @@ class TkellemServer
     Celluloid.logger = Tkellem::EasyLogger.logger
     @options = options
     @listeners = {}
-    @bouncers = {}
+    @bouncers = SupervisionGroup.new_link({})
     $tkellem_server = self
 
     @db = self.class.initialize_database(db_file)
@@ -50,10 +51,10 @@ class TkellemServer
   def run
     start_unix_server
     ListenAddress.all { |a| listen(a) }
-    NetworkUser.all { |nu| add_bouncer(Bouncer.new(nu)) }
+    NetworkUser.all { |nu| add_bouncer(nu) }
 
     begin
-      sleep
+      loop { sleep 5 }
     rescue Interrupt
     end
   end
@@ -64,7 +65,7 @@ class TkellemServer
     when ListenAddress
       listen(obj)
     when NetworkUser
-      add_bouncer(Bouncer.new(obj))
+      add_bouncer!(obj)
     end
   end
 
@@ -111,22 +112,22 @@ class TkellemServer
     info "No longer listening on #{listen_address}"
   end
 
-  def add_bouncer(bouncer)
-    key = [bouncer.user.id, bouncer.network.name]
-    raise("bouncer already exists: #{key}") if @bouncers.include?(key)
-    @bouncers[key] = bouncer
+  def add_bouncer(network_user)
+    key = [network_user.user_id, network_user.network.name]
+    raise("bouncer already exists: #{key}") if @bouncers.registry.key?(key)
+    @bouncers.supervise_as(key, Bouncer, network_user)
   end
 
   def find_bouncer(user, network_name)
     key = [user.id, network_name]
-    bouncer = @bouncers[key]
+    bouncer = @bouncers.registry[key]
     if !bouncer
       # find the public network with this name, and attempt to auto-add this user to it
       network = Network.first({ :user_id => nil, :name => network_name })
       if network
         NetworkUser.create(:user => user, :network => network)
         # AR callback should create the bouncer in sync
-        bouncer = @bouncers[key]
+        bouncer = @bouncers.registry[key]
       end
     end
     bouncer
