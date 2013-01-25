@@ -100,7 +100,7 @@ class Backlog
         ctx = msg.prefix.split(/[!~@]/, 2).first
       end
       stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}"))
+      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S") + " < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
       update_pos(ctx, stream.pos)
     end
   end
@@ -111,7 +111,7 @@ class Backlog
       return if msg.ctcp? && !msg.action?
       ctx = msg.args.first
       stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S > #{'* ' if msg.action?}#{msg.args.last}"))
+      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S") + " > #{'* ' if msg.action?}#{msg.args.last}")
       update_pos(ctx, stream.pos)
     end
   end
