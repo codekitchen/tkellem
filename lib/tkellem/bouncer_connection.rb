@@ -180,6 +180,7 @@ class BouncerConnection
   end
 
   def send_msg(msg)
+    return if @socket.closed?
     trace "to client: #{msg}"
     @socket.write("#{msg}\r\n")
   end

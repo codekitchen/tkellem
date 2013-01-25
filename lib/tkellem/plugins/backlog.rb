@@ -15,9 +15,11 @@ module Tkellem
 # different backlog implementation. Right now, it's always loaded though.
 class Backlog
   include Tkellem::EasyLogger
+  include Celluloid
+
+  cattr_accessor :replay_pool
 
   Bouncer.add_plugin(self)
-  cattr_accessor :instances
 
   def self.get_instance(bouncer)
     bouncer.data(self)[:instance] ||= self.new(bouncer)
@@ -57,7 +59,7 @@ class Backlog
     # open stream in append-only mode
     return @streams[ctx] if @streams[ctx]
     stream = @streams[ctx] = File.open(stream_filename(ctx), 'ab')
-    stream.seek(0, IO::SEEK_END)
+    stream.seek(0, ::IO::SEEK_END)
     @starting_pos[ctx] = stream.pos
     stream
   end
@@ -116,32 +118,48 @@ class Backlog
 
   def send_backlog(conn, device)
     device.each do |ctx_name, pos|
-      stream = File.open(stream_filename(ctx_name), 'rb')
-      stream.seek(pos)
-
-      while line = stream.gets
-        timestamp, msg = parse_line(line, ctx_name)
-        next unless msg
-        if msg.prefix
-          # to user
-        else
-          # from user, add prefix
-          if msg.args.first[0] == '#'[0]
-            # it's a room, we can just replay
-            msg.prefix = @bouncer.nick
-          else
-            # a one-on-one chat -- every client i've seen doesn't know how to
-            # display messages from themselves here, so we fake it by just
-            # adding an arrow and pretending the other user said it. shame.
-            msg.prefix = msg.args.first
-            msg.args[0] = @bouncer.nick
-            msg.args[-1] = "-> #{msg.args.last}"
-          end
-        end
-        conn.send_msg(msg.with_timestamp(timestamp))
-      end
-
+      filename = stream_filename(ctx_name)
+      Backlog.replay_pool.async(:replay, filename, pos, @bouncer, conn, ctx_name)
       device[ctx_name] = get_stream(ctx_name).pos
+    end
+  end
+end
+
+class BacklogReplay
+  include Celluloid
+
+  def replay(filename, pos, bouncer, conn, ctx_name)
+    stream = File.open(filename, 'rb')
+    stream.seek(pos)
+
+    while line = stream.gets
+      timestamp, msg = parse_line(line, ctx_name)
+      puts msg
+      puts msg.inspect
+      next unless msg
+      privmsg = msg.args.first[0] != '#'[0]
+      if msg.prefix
+        # to this user
+        if privmsg
+          msg.args[0] = bouncer.nick
+        else
+          # do nothing, it's good to send
+        end
+      else
+        # from this user, maybe add prefix
+        if privmsg
+          # a one-on-one chat -- every client i've seen doesn't know how to
+          # display messages from themselves here, so we fake it by just
+          # adding an arrow and pretending the other user said it. shame.
+          msg.prefix = msg.args.first
+          msg.args[0] = bouncer.nick
+          msg.args[-1] = "-> #{msg.args.last}"
+        else
+          # it's a room, we can just replay
+          msg.prefix = bouncer.nick
+        end
+      end
+      conn.send_msg(msg.with_timestamp(timestamp))
     end
   end
 
@@ -165,5 +183,7 @@ class Backlog
     end
   end
 end
+
+Backlog.replay_pool = BacklogReplay.pool(size: Celluloid.cores * 2)
 
 end
