@@ -73,7 +73,6 @@ class TkellemServer
     case obj
     when ListenAddress
       stop_listening(obj)
-    # TODO: remove bouncer on NetworkUser.destroy
     end
   end
 
@@ -111,6 +110,11 @@ class TkellemServer
   end
 
   def add_bouncer(network_user)
+    unless network_user.user && network_user.network
+      info "Terminating orphan network user #{network_user}"
+      network_user.destroy
+      return
+    end
     key = [network_user.user_id, network_user.network.name]
     raise("bouncer already exists: #{key}") if @bouncers.registry.key?(key)
     @bouncers.supervise_as(key, Bouncer, network_user)

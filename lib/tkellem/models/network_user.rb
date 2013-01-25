@@ -24,6 +24,11 @@ class NetworkUser < Sequel::Model
     super
     $tkellem_server.try(:after_create, self)
   end
+
+  def after_destroy
+    super
+    $tkellem_server.try(:after_destroy, self)
+  end
 end
 
 end
