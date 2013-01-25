@@ -28,19 +28,6 @@ def self.generate_ssl_ctx
   ctx
 end
 
-# MONKEY PUNCH
-class ::Celluloid::IO::SSLSocket
-  def accept
-    to_io.accept_nonblock
-  rescue ::IO::WaitReadable
-    wait_readable
-    retry
-  rescue ::IO::WaitWritable
-    wait_writable
-    retry
-  end
-end
-
 class BackoffSupervisor < ::Celluloid::SupervisionGroup
   attr_reader :registry
 
@@ -85,6 +72,12 @@ end
 class TCPListener < Listener
   def initialize(host, port)
     self.server = TCPServer.new(host, port)
+  end
+end
+
+class SSLListener < Listener
+  def initialize(host, port)
+    self.server = SSLServer.new(TCPServer.new(host, port), CelluloidTools.generate_ssl_ctx)
   end
 end
 

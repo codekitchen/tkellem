@@ -93,12 +93,14 @@ class TkellemServer
   def listen(listen_address)
     info "Listening on #{listen_address}"
 
-    listener = CelluloidTools::TCPListener.start(listen_address.address,
-                                                 listen_address.port) do |socket|
-      if listen_address.ssl
-        socket = Celluloid::IO::SSLSocket.new(socket, ssl_ctx)
-        socket.accept
-      end
+    if listen_address.ssl
+      server_class = CelluloidTools::SSLListener
+    else
+      server_class = CelluloidTools::TCPListener
+    end
+
+    listener = server_class.start(listen_address.address,
+                                  listen_address.port) do |socket|
       BouncerConnection.new(self, socket).run!
     end
 
