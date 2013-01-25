@@ -42,7 +42,7 @@ class TkellemServer
     Celluloid.logger = Tkellem::EasyLogger.logger
     @options = options
     @listeners = {}
-    @bouncers = SupervisionGroup.new_link({})
+    @bouncers = CelluloidTools::BackoffSupervisor.new_link({})
     $tkellem_server = self
 
     @db = self.class.initialize_database(db_file)
@@ -65,7 +65,7 @@ class TkellemServer
     when ListenAddress
       listen(obj)
     when NetworkUser
-      add_bouncer!(obj)
+      async.add_bouncer(obj)
     end
   end
 
@@ -86,10 +86,6 @@ class TkellemServer
     end
   end
 
-  def ssl_ctx
-    @ssl_ctx ||= CelluloidTools.generate_ssl_ctx
-  end
-
   def listen(listen_address)
     info "Listening on #{listen_address}"
 
@@ -101,7 +97,7 @@ class TkellemServer
 
     listener = server_class.start(listen_address.address,
                                   listen_address.port) do |socket|
-      BouncerConnection.new(self, socket).run!
+      BouncerConnection.new(self, socket).async.run
     end
 
     @listeners[listen_address.id] = listener

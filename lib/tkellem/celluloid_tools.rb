@@ -50,7 +50,7 @@ class Listener < Struct.new(:server, :callback)
   def self.start(*args, &callback)
     listener = self.new(*args)
     listener.callback = callback
-    listener.run!
+    listener.async.run
     listener
   end
 

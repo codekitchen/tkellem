@@ -31,7 +31,7 @@ class Bouncer
     # clients waiting for us to connect to the irc server
     @waiting_clients = []
 
-    connect!
+    async.connect
   end
 
   def data(key)
@@ -184,7 +184,7 @@ class Bouncer
     send_msg("USER #{@user.username} somehost tkellem :#{@user.name}@tkellem")
     change_nick(@nick, true)
     @connected_at = Time.now
-    run!
+    async.run
   end
 
   def disconnected!
