@@ -12,6 +12,8 @@ class Bouncer
   cattr_accessor :plugins
   self.plugins = []
 
+  class Room < Struct.new(:name, :topic, :topic_setter, :topic_time); end
+
   def initialize(network_user)
     @network_user = network_user
     @user = network_user.user
@@ -21,7 +23,7 @@ class Bouncer
     # maps { client_conn => state_hash }
     @active_conns = {}
     @welcomes = []
-    @rooms = []
+    @rooms = {}
     # maps { client_conn => away_status_or_nil }
     @away = {}
     # plugin data
@@ -62,7 +64,7 @@ class Bouncer
     client.send_msg(":#{client.connecting_nick} NICK #{nick}") if client.connecting_nick != nick
     send_welcome(client)
     # make the client join all the rooms that we're in
-    @rooms.each { |room| client.simulate_join(room) }
+    @rooms.each_value { |room| client.simulate_join(room) }
 
     plugins.each { |plugin| plugin.new_client_connected(self, client) }
     check_away_status
@@ -112,12 +114,25 @@ class Bouncer
       false
     when 'JOIN'
       debug "#{msg.target_user} joined #{msg.args.first}"
-      @rooms << msg.args.first if msg.target_user == @nick
+      @rooms[msg.args.first] = Room.new(msg.args.first) if msg.target_user == @nick
       true
     when 'PART'
       debug "#{msg.target_user} left #{msg.args.first}"
       @rooms.delete(msg.args.first) if msg.target_user == @nick
       true
+    when 'TOPIC'
+      if room = @rooms[msg.args.first]
+        room.topic = msg.args.last
+      end
+    when '332' # topic replay
+      if room = @rooms[msg.args[1]]
+        room.topic = msg.args.last
+      end
+    when '333' # topic timestamp
+      if room = @rooms[msg.args[1]]
+        room.topic_setter = msg.args[2]
+        room.topic_time = msg.args[3]
+      end
     when 'PING'
       send_msg("PONG tkellem!tkellem :#{msg.args.last}")
       false
@@ -205,8 +220,8 @@ class Bouncer
   end
 
   def ready!
-    @rooms.each do |room|
-      send_msg("JOIN #{room}")
+    @rooms.each_key do |room|
+      send_msg("JOIN #{room.name}")
     end
 
     check_away_status
