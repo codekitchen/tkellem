@@ -65,7 +65,7 @@ class TkellemServer
     when ListenAddress
       listen(obj)
     when NetworkUser
-      async.add_bouncer(obj)
+      add_bouncer(obj)
     end
   end
 

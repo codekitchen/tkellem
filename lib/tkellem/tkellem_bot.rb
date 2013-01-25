@@ -258,7 +258,7 @@ class TkellemBot
 
       if opts['username']
         if Command.admin_user?(user)
-          user = User.first(:conditions => { :username => opts['username'] })
+          user = User.where(:username => opts['username']).first
         else
           raise Command::ArgumentError, "Only admins can change other passwords"
         end
@@ -303,7 +303,7 @@ class TkellemBot
 
     def execute
       if opts['network'].present? # only settable by admins
-        target = Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase])
+        target = Network.where(:user_id => nil, :name => opts['network'].downcase).first
       else
         target = network_user
       end
@@ -339,7 +339,7 @@ class TkellemBot
     admin_option('public', '--public', "Create new public network. Once created, public/private status can't be modified.")
 
     def list
-      public_networks = Network.all(:conditions => 'user_id IS NULL')
+      public_networks = Network.where(:user_id => nil).all
       user_networks = user.try(:reload).try(:networks) || []
       if user_networks.present? && public_networks.present?
         r "Public networks are prefixed with [P], user-specific networks with [U]."
@@ -355,15 +355,14 @@ class TkellemBot
     end
 
     def execute
-      # TODO: this got gross
       if args.empty? && !opts['remove']
         list
         return
       end
 
       if opts['network'].present?
-        target = Network.first(:conditions => ["name = ? AND user_id = ?", opts['network'].downcase, user.try(:id)])
-        target ||= Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase]) if self.class.admin_user?(user)
+        target = Network.where(:name => opts['network'].downcase, :user_id => user.try(:id)).first
+        target ||= Network.where(:user_id => nil, :name => opts['network'].downcase).first if self.class.admin_user?(user)
       else
         target = network_user.try(:network)
         if target && target.public? && !self.class.admin_user?(user)
@@ -379,7 +378,7 @@ class TkellemBot
         raise(Command::ArgumentError, "No network found") unless target
         raise(Command::ArgumentError, "You must explicitly specify the network to remove") unless opts['network']
         if uri
-          target.hosts.first(:conditions => addr_args).try(:destroy)
+          target.hosts.where(addr_args).first.try(:destroy)
           respond "    #{show(target)}"
         else
           target.destroy
@@ -397,16 +396,9 @@ class TkellemBot
           end
         end
 
-        target.attributes = { :hosts_attributes => [addr_args] }
-        target.save
-        if target.errors.any?
-          respond "Error:"
-          target.errors.full_messages.each { |m| respond "    #{m}" }
-          respond "    #{show(target)}"
-        else
-          respond("updated:")
-          respond "    #{show(target)}"
-        end
+        Host.create(addr_args.merge(network: target))
+        respond("updated:")
+        respond "    #{show(target)}"
       end
     end
   end

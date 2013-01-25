@@ -134,8 +134,6 @@ class BacklogReplay
 
     while line = stream.gets
       timestamp, msg = parse_line(line, ctx_name)
-      puts msg
-      puts msg.inspect
       next unless msg
       privmsg = msg.args.first[0] != '#'[0]
       if msg.prefix
