@@ -17,10 +17,12 @@ Gem::Specification.new do |s|
   s.default_executable = %q{tkellem}
   s.require_paths = ["lib"]
 
-  s.add_dependency "celluloid", "0.12.4"
-  s.add_dependency "celluloid-io", "0.12.1"
-  s.add_dependency "activerecord", "3.2.10"
+  s.add_dependency "celluloid", "~> 0.13.0"
+  s.add_dependency "celluloid-io", "~> 0.13.0"
+  s.add_dependency "activesupport", "3.2.10"
+  s.add_dependency "sequel", "3.42.0"
   s.add_dependency "sqlite3", "1.3.6"
 
+  s.add_development_dependency "rake"
   s.add_development_dependency "rspec", "~> 2.5"
 end
