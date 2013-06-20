@@ -1,3 +1,3 @@
 module Tkellem
-  VERSION = "0.9.0.beta1"
+  VERSION = "0.9.0.beta2"
 end

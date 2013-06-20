@@ -18,7 +18,7 @@ class SocketServer
   def initialize(socket)
     @socket = socket
     @delimiter = "\n"
-    run!
+    async.run
   end
 
   def receive_line(line)
