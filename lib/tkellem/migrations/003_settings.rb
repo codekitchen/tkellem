@@ -12,7 +12,6 @@ Sequel.migration do
     end
 
     self[:settings].insert(:name => 'user_registration', :value => 'closed')
-    self[:settings].insert(:name => 'recaptcha_api_key', :value => '')
     self[:settings].insert(:name => 'allow_user_networks', :value =>  'false')
   end
 

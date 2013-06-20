@@ -48,13 +48,6 @@ class BouncerConnection
 
   def msg_tkellem(msg)
     case @state
-    when :recaptcha
-      if @recaptcha.valid_response?(msg.args.last)
-        say_as_tkellem "Looks like you're human. Whew, I hate robots."
-        user_registration_get_password
-      else
-        say_as_tkellem "Nope, that's not right. Please try again."
-      end
     when :password
       user = User.create(:username => @username, :password => msg.args.last, :role => 'user')
       if user.errors.any?
@@ -143,14 +136,6 @@ class BouncerConnection
         say_as_tkellem "Welcome to tkellem, #{@username}. If you already have an account and were trying to connect, please check your username, as it wasn't recognized."
         say_as_tkellem "Otherwise, follow these instructions to create an account."
         say_as_tkellem ' '
-        if recaptcha = Setting.get('recaptcha_api_key').presence
-          @state = :recaptcha
-          require 'tkellem/plugins/recaptcha'
-          @recaptcha = Recaptcha.new(*recaptcha.split(',', 2))
-          say_as_tkellem "First, you'll need to take a captcha test to verify that you aren't an evil robot bent on destroying humankind."
-          say_as_tkellem "Visit this URL, and tell me the code you are given after solving the captcha: #{@recaptcha.challenge_url}"
-          return
-        end
         user_registration_get_password
       end
     end

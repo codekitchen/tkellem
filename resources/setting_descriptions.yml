@@ -3,17 +3,7 @@ user_registration:
   help: |+
     Allow new users to register themselves with this instance of tkellem, rather than having to create all users through the tkellem console. Set to 'open' to allow self-registration, 'verified' to allow self-registration but require admin approval before activation, any other value means closed registration.
 
-    If you enable this, you should configure recaptcha as well, see the help for the recaptcha_api_key setting.
-
     New users will register themselves by connecting to tkellem with a username but no password and no network specified. The tkellem bot will walk them through the process.
-
-recaptcha_api_key:
-  help: |+
-    Configure the recaptcha API key for public registrations. Generate a key by visiting http://www.google.com/recaptcha/mailhide/apikey . Then set this setting to the value 
-
-    <public key>,<private key>
-
-    That is, the public key, then a comma, then the private key. This will protect user self-signups behind a recaptcha check.
 
 allow_user_networks:
   help: |+
