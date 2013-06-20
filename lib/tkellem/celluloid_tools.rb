@@ -113,7 +113,7 @@ module LineReader
 
   def run
     loop do
-      line = readline
+      line = readline.force_encoding(Encoding::UTF_8)
       receive_line(line)
     end
   rescue EOFError, IOError, OpenSSL::SSL::SSLError
