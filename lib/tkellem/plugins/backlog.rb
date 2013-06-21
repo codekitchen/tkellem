@@ -48,6 +48,8 @@ class Backlog
     @streams = {}
     @starting_pos = {}
     @dir = File.expand_path("~/.tkellem/logs/#{bouncer.user.username}/#{bouncer.network.name}")
+    @user_id = bouncer.user.id
+    @network_id = bouncer.network.id
     FileUtils.mkdir_p(@dir)
   end
 
