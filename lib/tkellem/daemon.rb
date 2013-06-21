@@ -15,7 +15,7 @@ class Tkellem::Daemon
   end
 
   def run
-    opts = OptionParser.new do |opts|
+    op = OptionParser.new do |opts|
       opts.banner = "Usage #{$0} <command> <options>"
       opts.separator %{\nWhere <command> is one of:
   start      start the jobs daemon
@@ -30,7 +30,7 @@ class Tkellem::Daemon
       opts.on("-p", "--path", "Use alternate folder for tkellem data (default #{options[:path]})") { |p| options[:path] = p }
       opts.on_tail("-h", "--help", "Show this message") { puts opts; exit }
     end
-    opts.parse!(@args)
+    op.parse!(@args)
 
     FileUtils.mkdir_p(path)
     File.chmod(0700, path)
@@ -88,6 +88,7 @@ class Tkellem::Daemon
 
   def start
     trap("INT") { EM.stop }
+    remove_files
     EM.run do
       @admin = EM.start_unix_domain_server(socket_file, Tkellem::SocketServer)
       Tkellem::TkellemServer.new
@@ -104,9 +105,6 @@ class Tkellem::Daemon
     @daemon = true
     File.open(pid_file, 'wb') { |f| f.write(Process.pid.to_s) }
 
-    # TODO: support syslog
-    require 'logger'
-    logger = Logger.new(log_file)
     STDIN.reopen("/dev/null")
     STDOUT.reopen(log_file, 'a')
     STDERR.reopen(STDOUT)
@@ -147,7 +145,7 @@ class Tkellem::Daemon
   end
 
   def remove_files
-    FileUtils.rm(socket_file)
+    FileUtils.rm(socket_file) if File.file?(socket_file)
     return unless @daemon
     pid = File.read(pid_file) if File.file?(pid_file)
     if pid.to_i == Process.pid
