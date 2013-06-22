@@ -78,7 +78,7 @@ module BouncerConnection
       end
     else
       if @user
-        TkellemBot.run_command(msg.args.join(' '), @bouncer) do |response|
+        TkellemBot.run_command(msg.args.join(' '), @bouncer, self) do |response|
           say_as_tkellem(response)
         end
       end

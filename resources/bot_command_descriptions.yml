@@ -65,3 +65,16 @@ SETTING:
     Examples:
         SETTING
         SETTING user_registration open
+
+BACKLOG:
+  banner: "BACKLOG [<room or user>] <hours>"
+  help: |+
+
+    View backlog for a given room (or all rooms).
+
+    Examples:
+      view 3 hours of backlog for all rooms:
+        BACKLOG 3
+      view 2 hours of backlog for the #friends room:
+        BACKLOG #friends 2
+

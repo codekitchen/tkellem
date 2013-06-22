@@ -6,7 +6,7 @@ module Tkellem
 class TkellemBot
   # careful here -- if no bouncer is given, it's assumed the command is running as
   # an admin
-  def self.run_command(line, bouncer, &block)
+  def self.run_command(line, bouncer, conn, &block)
     args = Shellwords.shellwords(line)
     command_name = args.shift.upcase
     command = commands[command_name]
@@ -16,11 +16,11 @@ class TkellemBot
       return
     end
 
-    command.run(args, bouncer, block)
+    command.run(args, bouncer, conn, block)
   end
 
   class Command
-    attr_accessor :args, :bouncer, :opts, :options
+    attr_accessor :args, :bouncer, :conn, :opts, :options
 
     def self.option(name, *args)
       @options ||= {}
@@ -62,7 +62,7 @@ class TkellemBot
       end
     end
 
-    def self.run(args_arr, bouncer, block)
+    def self.run(args_arr, bouncer, conn, block)
       if admin_only? && !admin_user?(bouncer.try(:user))
         block.call "You can only run #{name} as an admin."
         return
@@ -71,6 +71,7 @@ class TkellemBot
 
       cmd.args = args_arr
       cmd.bouncer = bouncer
+      cmd.conn = conn
 
       cmd.options = build_options(bouncer.try(:user), cmd)
       cmd.options.parse!(args_arr)

@@ -1,3 +1,4 @@
+require 'backwards_file_reader'
 require 'fileutils'
 require 'pathname'
 require 'time'
@@ -5,6 +6,7 @@ require 'time'
 require 'active_support/core_ext/class/attribute_accessors'
 
 require 'tkellem/irc_message'
+require 'tkellem/tkellem_bot'
 
 module Tkellem
 
@@ -87,7 +89,7 @@ class Backlog
     @dir + "#{ctx}.log"
   end
 
-  def all_existing_stream_paths
+  def all_existing_ctxs
     @dir.entries.select { |e| e.extname == ".log" }.map { |e| e.basename(".log").to_s }
   end
 
@@ -111,7 +113,7 @@ class Backlog
 
   def client_connected(conn)
     device = get_device(conn)
-    behind = all_existing_stream_paths.select do |ctx_name|
+    behind = all_existing_ctxs.select do |ctx_name|
       eof = stream_size(ctx_name)
       # default to the end of file, rather than the beginning, for new devices
       # that way they don't get flooded the first time they connect
@@ -119,7 +121,7 @@ class Backlog
     end
     if !behind.empty?
       # this device has missed messages, replay all the relevant backlogs
-      send_backlog(conn, device, behind)
+      send_connect_backlogs(conn, device, behind)
     end
   end
 
@@ -168,41 +170,56 @@ class Backlog
     end
   end
 
-  def send_backlog(conn, device, contexts)
+  def send_connect_backlogs(conn, device, contexts)
     contexts.each do |ctx_name|
+      start_pos = device.pos(ctx_name)
       get_stream(ctx_name, true) do |stream|
-        stream.seek(device.pos(ctx_name))
-
-        while line = stream.gets
-          timestamp, msg = parse_line(line, ctx_name)
-          next unless msg
-          privmsg = msg.args.first[0] != '#'[0]
-          if msg.prefix
-            # to this user
-            if privmsg
-              msg.args[0] = @bouncer.nick
-            else
-              # do nothing, it's good to send
-            end
-          else
-            # from this user
-            if privmsg
-              # a one-on-one chat -- every client i've seen doesn't know how to
-              # display messages from themselves here, so we fake it by just
-              # adding an arrow and pretending the other user said it. shame.
-              msg.prefix = msg.args.first
-              msg.args[0] = @bouncer.nick
-              msg.args[-1] = "-> #{msg.args.last}"
-            else
-              # it's a room, we can just replay
-              msg.prefix = @bouncer.nick
-            end
-          end
-          conn.send_msg(msg.with_timestamp(timestamp))
-        end
-
+        stream.seek(start_pos)
+        send_backlog(conn, ctx_name, stream)
         device.update_pos(ctx_name, stream.pos)
       end
+    end
+  end
+
+  def send_backlog_since(conn, start_time, contexts)
+    debug "scanning for backlog from #{start_time.inspect}"
+    contexts.each do |ctx_name|
+      get_stream(ctx_name, true) do |stream|
+        last_line_len = 0
+        BackwardsFileReader.scan(stream) { |line| last_line_len = line.length; Time.parse(line[0,19]) >= start_time }
+        stream.seek(last_line_len, IO::SEEK_CUR)
+        send_backlog(conn, ctx_name, stream)
+      end
+    end
+  end
+
+  def send_backlog(conn, ctx_name, stream)
+    while line = stream.gets
+      timestamp, msg = parse_line(line, ctx_name)
+      next unless msg
+      privmsg = msg.args.first[0] != '#'[0]
+      if msg.prefix
+        # to this user
+        if privmsg
+          msg.args[0] = @bouncer.nick
+        else
+          # do nothing, it's good to send
+        end
+      else
+        # from this user
+        if privmsg
+          # a one-on-one chat -- every client i've seen doesn't know how to
+          # display messages from themselves here, so we fake it by just
+          # adding an arrow and pretending the other user said it. shame.
+          msg.prefix = msg.args.first
+          msg.args[0] = @bouncer.nick
+          msg.args[-1] = "-> #{msg.args.last}"
+        else
+          # it's a room, we can just replay
+          msg.prefix = @bouncer.nick
+        end
+      end
+      conn.send_msg(msg.with_timestamp(timestamp))
     end
   end
 
@@ -224,6 +241,26 @@ class Backlog
     else
       nil
     end
+  end
+end
+
+class BacklogCommand < TkellemBot::Command
+  register 'backlog'
+
+  def self.admin_only?
+    false
+  end
+
+  def execute
+    hours = args.pop.to_f
+    hours = 1 if hours <= 0 || hours >= (24*31)
+    cutoff = hours.hours.ago
+    backlog = Backlog.get_instance(bouncer)
+    rooms = [args.pop].compact
+    if rooms.empty?
+      rooms = backlog.all_existing_ctxs
+    end
+    backlog.send_backlog_since(conn, cutoff, rooms)
   end
 end
 
