@@ -89,7 +89,7 @@ class TkellemServer
 
     key = bouncers_key(network_user)
     raise("bouncer already exists: #{key}") if @bouncers.include?(key)
-    @bouncers[key] = Bouncer.new(bouncer)
+    @bouncers[key] = Bouncer.new(network_user)
   end
 
   def stop_bouncer(obj)
