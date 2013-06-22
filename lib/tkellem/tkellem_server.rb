@@ -1,5 +1,6 @@
 require 'eventmachine'
 require 'active_record'
+require 'rails/observers/activerecord/active_record'
 
 require 'tkellem/bouncer_connection'
 require 'tkellem/bouncer'

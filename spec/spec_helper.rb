@@ -12,14 +12,14 @@ ActiveRecord::Migration.verbose = false
 ActiveRecord::Migrator.migrate(File.expand_path("../../lib/tkellem/migrations", __FILE__), nil)
 
 RSpec.configure do |config|
-  config.before(:each) do
-    ActiveRecord::Base.connection.increment_open_transactions
-    ActiveRecord::Base.connection.begin_db_transaction
-  end
-
-  config.after(:each) do
-    ActiveRecord::Base.connection.rollback_db_transaction
-    ActiveRecord::Base.connection.decrement_open_transactions
+  config.around(:each) do |test|
+    EM.run do
+      ActiveRecord::Base.transaction do
+        test.run
+        raise ActiveRecord::Rollback
+      end
+      EM.stop
+    end
   end
 
   def m(line)

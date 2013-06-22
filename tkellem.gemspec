@@ -17,10 +17,11 @@ Gem::Specification.new do |s|
   s.default_executable = %q{tkellem}
   s.require_paths = ["lib"]
 
-  s.add_dependency "eventmachine", "~> 0.12.10"
-  s.add_dependency "activerecord", "~> 3.0.0"
+  s.add_dependency "eventmachine", "~> 1.0.3"
+  s.add_dependency "activerecord", "~> 4.0.0.rc2"
   s.add_dependency "sqlite3", "~> 1.3.3"
+  s.add_dependency "rails-observers"
 
   s.add_development_dependency "rspec", "~> 2.5"
-  s.add_development_dependency "rcov"
+  s.add_development_dependency "simplecov"
 end
