@@ -252,8 +252,10 @@ class BacklogCommand < TkellemBot::Command
   end
 
   def execute
-    hours = args.pop.to_f
-    hours = 1 if hours <= 0 || hours >= (24*31)
+    hour_str = args.pop
+    hours = hour_str.to_f
+    hours *= 24 if hour_str[-1] == 'd'[-1]
+    hours = 1 if hours <= 0 || hours >= (24*365)
     cutoff = hours.hours.ago
     backlog = Backlog.get_instance(bouncer)
     rooms = [args.pop].compact
