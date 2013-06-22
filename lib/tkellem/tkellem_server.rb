@@ -5,6 +5,7 @@ require 'rails/observers/activerecord/active_record'
 require 'tkellem/bouncer_connection'
 require 'tkellem/bouncer'
 
+require 'tkellem/models/backlog_position'
 require 'tkellem/models/host'
 require 'tkellem/models/listen_address'
 require 'tkellem/models/network'

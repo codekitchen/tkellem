@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'pathname'
 require 'time'
 
 require 'active_support/core_ext/class/attribute_accessors'
@@ -40,44 +41,94 @@ class Backlog
     true
   end
 
+
+  #### IMPL
+
+  class Device < Struct.new(:network_user, :device_name, :positions)
+    def initialize(*a)
+      super
+      self.positions = {}
+    end
+
+    def update_pos(ctx_name, pos)
+      # TODO: it'd be a good idea to throttle these updates to once every few seconds per ctx
+      # right now we're kind of harsh on the sqlite db
+      self.position(ctx_name).first_or_create.update_attribute(:position, pos)
+    end
+
+    def pos(ctx_name, pos_for_new = 0)
+      backlog_pos = self.position(ctx_name).first_or_initialize
+      if backlog_pos.new_record?
+        backlog_pos.position = pos_for_new
+        backlog_pos.save
+      end
+      backlog_pos.position
+    end
+
+    protected
+
+    def position(ctx_name)
+      self.positions[ctx_name] ||=
+        BacklogPosition.where(:network_user_id => network_user.id,
+                              :context_name    => ctx_name,
+                              :device_name     => device_name)
+    end
+  end
+
   def initialize(bouncer)
     @bouncer = bouncer
+    @network_user = bouncer.network_user
     @devices = {}
-    @streams = {}
-    @starting_pos = {}
-    @dir = File.expand_path("~/.tkellem/logs/#{bouncer.user.username}/#{bouncer.network.name}")
-    FileUtils.mkdir_p(@dir)
+    @dir = Pathname.new(File.expand_path("~/.tkellem/logs/#{bouncer.user.username}/#{bouncer.network.name}"))
+    @dir.mkpath()
   end
 
-  def stream_filename(ctx)
-    File.join(@dir, "#{ctx}.log")
+  def stream_path(ctx)
+    @dir + "#{ctx}.log"
   end
 
-  def get_stream(ctx)
-    # open stream in append-only mode
-    return @streams[ctx] if @streams[ctx]
-    stream = @streams[ctx] = File.open(stream_filename(ctx), 'ab')
-    stream.seek(0, IO::SEEK_END)
-    @starting_pos[ctx] = stream.pos
-    stream
+  def all_existing_stream_paths
+    @dir.entries.select { |e| e.extname == ".log" }.map { |e| e.basename(".log").to_s }
+  end
+
+  def get_stream(ctx, for_reading = false)
+    mode = for_reading ? 'rb' : 'ab'
+    stream_path(ctx).open(mode) do |stream|
+      if !for_reading
+        stream.seek(0, IO::SEEK_END)
+      end
+      yield stream
+    end
+  end
+
+  def stream_size(ctx)
+    stream_path(ctx).size
   end
 
   def get_device(conn)
-    @devices[conn.device_name] ||= Hash.new { |h,k| h[k] = @starting_pos[k] }
+    @devices[conn.device_name] ||= Device.new(@network_user, conn.device_name)
   end
 
   def client_connected(conn)
     device = get_device(conn)
-    if @streams.any? { |ctx_name, stream| device[ctx_name] < stream.pos }
-      # this device has missed messages, replay all the backlogs
-      send_backlog(conn, device)
+    behind = all_existing_stream_paths.select do |ctx_name|
+      eof = stream_size(ctx_name)
+      # default to the end of file, rather than the beginning, for new devices
+      # that way they don't get flooded the first time they connect
+      device.pos(ctx_name, eof) < eof
+    end
+    if !behind.empty?
+      # this device has missed messages, replay all the relevant backlogs
+      send_backlog(conn, device, behind)
     end
   end
 
   def update_pos(ctx_name, pos)
+    # don't just iterate @devices here, because that may contain devices that
+    # have since been disconnected
     @bouncer.active_conns.each do |conn|
       device = get_device(conn)
-      device[ctx_name] = pos
+      device.update_pos(ctx_name, pos)
     end
   end
 
@@ -97,9 +148,7 @@ class Backlog
         # incoming pm, fake ctx to be the sender's nick
         ctx = msg.prefix.split(/[!~@]/, 2).first
       end
-      stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S") + " < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
-      update_pos(ctx, stream.pos)
+      write_msg(ctx, Time.now.strftime("%d-%m-%Y %H:%M:%S") + " < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
     end
   end
 
@@ -108,46 +157,52 @@ class Backlog
     when 'PRIVMSG'
       return if msg.ctcp? && !msg.action?
       ctx = msg.args.first
-      stream = get_stream(ctx)
-      stream.puts(Time.now.strftime("%d-%m-%Y %H:%M:%S") + " > #{'* ' if msg.action?}#{msg.args.last}")
+      write_msg(ctx, Time.now.strftime("%d-%m-%Y %H:%M:%S") + " > #{'* ' if msg.action?}#{msg.args.last}")
+    end
+  end
+
+  def write_msg(ctx, processed_msg)
+    get_stream(ctx) do |stream|
+      stream.puts(processed_msg)
       update_pos(ctx, stream.pos)
     end
   end
 
-  def send_backlog(conn, device)
-    device.each do |ctx_name, pos|
-      stream = File.open(stream_filename(ctx_name), 'rb')
-      stream.seek(pos)
+  def send_backlog(conn, device, contexts)
+    contexts.each do |ctx_name|
+      get_stream(ctx_name, true) do |stream|
+        stream.seek(device.pos(ctx_name))
 
-      while line = stream.gets
-        timestamp, msg = parse_line(line, ctx_name)
-        next unless msg
-        privmsg = msg.args.first[0] != '#'[0]
-        if msg.prefix
-          # to this user
-          if privmsg
-            msg.args[0] = @bouncer.nick
+        while line = stream.gets
+          timestamp, msg = parse_line(line, ctx_name)
+          next unless msg
+          privmsg = msg.args.first[0] != '#'[0]
+          if msg.prefix
+            # to this user
+            if privmsg
+              msg.args[0] = @bouncer.nick
+            else
+              # do nothing, it's good to send
+            end
           else
-            # do nothing, it's good to send
+            # from this user
+            if privmsg
+              # a one-on-one chat -- every client i've seen doesn't know how to
+              # display messages from themselves here, so we fake it by just
+              # adding an arrow and pretending the other user said it. shame.
+              msg.prefix = msg.args.first
+              msg.args[0] = @bouncer.nick
+              msg.args[-1] = "-> #{msg.args.last}"
+            else
+              # it's a room, we can just replay
+              msg.prefix = @bouncer.nick
+            end
           end
-        else
-          # from this user
-          if privmsg
-            # a one-on-one chat -- every client i've seen doesn't know how to
-            # display messages from themselves here, so we fake it by just
-            # adding an arrow and pretending the other user said it. shame.
-            msg.prefix = msg.args.first
-            msg.args[0] = @bouncer.nick
-            msg.args[-1] = "-> #{msg.args.last}"
-          else
-            # it's a room, we can just replay
-            msg.prefix = @bouncer.nick
-          end
+          conn.send_msg(msg.with_timestamp(timestamp))
         end
-        conn.send_msg(msg.with_timestamp(timestamp))
-      end
 
-      device[ctx_name] = get_stream(ctx_name).pos
+        device.update_pos(ctx_name, stream.pos)
+      end
     end
   end
 
