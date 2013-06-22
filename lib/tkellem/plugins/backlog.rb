@@ -122,20 +122,26 @@ class Backlog
       while line = stream.gets
         timestamp, msg = parse_line(line, ctx_name)
         next unless msg
+        privmsg = msg.args.first[0] != '#'[0]
         if msg.prefix
-          # to user
-        else
-          # from user, add prefix
-          if msg.args.first[0] == '#'[0]
-            # it's a room, we can just replay
-            msg.prefix = @bouncer.nick
+          # to this user
+          if privmsg
+            msg.args[0] = @bouncer.nick
           else
+            # do nothing, it's good to send
+          end
+        else
+          # from this user
+          if privmsg
             # a one-on-one chat -- every client i've seen doesn't know how to
             # display messages from themselves here, so we fake it by just
             # adding an arrow and pretending the other user said it. shame.
             msg.prefix = msg.args.first
             msg.args[0] = @bouncer.nick
             msg.args[-1] = "-> #{msg.args.last}"
+          else
+            # it's a room, we can just replay
+            msg.prefix = @bouncer.nick
           end
         end
         conn.send_msg(msg.with_timestamp(timestamp))
