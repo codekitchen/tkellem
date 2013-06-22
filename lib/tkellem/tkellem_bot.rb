@@ -4,9 +4,9 @@ require 'yaml'
 module Tkellem
 
 class TkellemBot
-  # careful here -- if no user is given, it's assumed the command is running as
+  # careful here -- if no bouncer is given, it's assumed the command is running as
   # an admin
-  def self.run_command(line, user, network_user, &block)
+  def self.run_command(line, bouncer, &block)
     args = Shellwords.shellwords(line)
     command_name = args.shift.upcase
     command = commands[command_name]
@@ -16,11 +16,11 @@ class TkellemBot
       return
     end
 
-    command.run(args, user, network_user, block)
+    command.run(args, bouncer, block)
   end
 
   class Command
-    attr_accessor :args, :user, :network_user, :opts, :options
+    attr_accessor :args, :bouncer, :opts, :options
 
     def self.option(name, *args)
       @options ||= {}
@@ -62,18 +62,17 @@ class TkellemBot
       end
     end
 
-    def self.run(args_arr, user, network_user, block)
-      if admin_only? && !admin_user?(user)
+    def self.run(args_arr, bouncer, block)
+      if admin_only? && !admin_user?(bouncer.try(:user))
         block.call "You can only run #{name} as an admin."
         return
       end
       cmd = self.new(block)
 
       cmd.args = args_arr
-      cmd.user = user
-      cmd.network_user = network_user
+      cmd.bouncer = bouncer
 
-      cmd.options = build_options(user, cmd)
+      cmd.options = build_options(bouncer.try(:user), cmd)
       cmd.options.parse!(args_arr)
 
       cmd.execute
@@ -84,6 +83,10 @@ class TkellemBot
     def initialize(responder)
       @responder = responder
       @opts = {}
+    end
+
+    def user
+      bouncer.try(:user)
     end
 
     def show_help
@@ -305,7 +308,7 @@ class TkellemBot
       if opts['network'].present? # only settable by admins
         target = Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase])
       else
-        target = network_user
+        target = bouncer.try(:network_user)
       end
       raise(Command::ArgumentError, "No network found") unless target
 
@@ -365,7 +368,7 @@ class TkellemBot
         target = Network.first(:conditions => ["name = ? AND user_id = ?", opts['network'].downcase, user.try(:id)])
         target ||= Network.first(:conditions => ["name = ? AND user_id IS NULL", opts['network'].downcase]) if self.class.admin_user?(user)
       else
-        target = network_user.try(:network)
+        target = bouncer.try(:network)
         if target && target.public? && !self.class.admin_user?(user)
           raise(Command::ArgumentError, "Only admins can modify public networks")
         end

@@ -53,7 +53,7 @@ class Tkellem::Daemon
     when 'admin'
       admin
     when nil
-      puts opts
+      puts op
     else
       raise("Unknown command: #{command.inspect}")
     end
