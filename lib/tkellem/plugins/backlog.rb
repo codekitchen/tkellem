@@ -95,7 +95,10 @@ class Backlog
 
   def get_stream(ctx, for_reading = false)
     mode = for_reading ? 'rb' : 'ab'
-    stream_path(ctx).open(mode) do |stream|
+    ctx = ctx.gsub(%r{[\./\\]}, '')
+    path = stream_path(ctx)
+    return unless path.file?
+    path.open(mode) do |stream|
       if !for_reading
         stream.seek(0, IO::SEEK_END)
       end
@@ -186,7 +189,12 @@ class Backlog
     contexts.each do |ctx_name|
       get_stream(ctx_name, true) do |stream|
         last_line_len = 0
-        BackwardsFileReader.scan(stream) { |line| last_line_len = line.length; Time.parse(line[0,19]) >= start_time }
+        BackwardsFileReader.scan(stream) do |line|
+          # remember this last line length so we can scan past it
+          last_line_len = line.length
+          timestamp = Time.parse(line[0,19]) rescue nil
+          !timestamp || timestamp >= start_time
+        end
         stream.seek(last_line_len, IO::SEEK_CUR)
         send_backlog(conn, ctx_name, stream)
       end
@@ -254,7 +262,7 @@ class BacklogCommand < TkellemBot::Command
   def execute
     hour_str = args.pop
     hours = hour_str.to_f
-    hours *= 24 if hour_str[-1] == 'd'[-1]
+    hours *= 24 if hour_str && hour_str[-1] == 'd'[-1]
     hours = 1 if hours <= 0 || hours >= (24*365)
     cutoff = hours.hours.ago
     backlog = Backlog.get_instance(bouncer)
