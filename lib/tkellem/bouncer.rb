@@ -200,6 +200,10 @@ class Bouncer
     connect!
   end
 
+  def kill!
+    @active_conns.each { |c,s| c.close_connection }
+  end
+
   protected
 
   def change_nick(new_nick, force = false)

@@ -36,7 +36,7 @@ class TkellemServer
     end
 
     ListenAddress.all.each { |a| listen(a) }
-    NetworkUser.find_each { |nu| add_bouncer(Bouncer.new(nu)) }
+    NetworkUser.find_each { |nu| add_bouncer(nu) }
     Observer.forward_to << self
   end
 
@@ -50,7 +50,7 @@ class TkellemServer
     when ListenAddress
       listen(obj)
     when NetworkUser
-      add_bouncer(Bouncer.new(obj))
+      add_bouncer(obj)
     end
   end
 
@@ -58,15 +58,12 @@ class TkellemServer
     case obj
     when ListenAddress
       stop_listening(obj)
-    # TODO: remove bouncer on NetworkUser.destroy
+    when NetworkUser
+      stop_bouncer(obj)
     end
   end
 
   def listen(listen_address)
-    address = listen_address.address
-    port = listen_address.port
-    ssl = listen_address.ssl
-
     info "Listening on #{listen_address}"
 
     @listeners[listen_address.id] = EM.start_server(listen_address.address,
@@ -83,10 +80,24 @@ class TkellemServer
     info "No longer listening on #{listen_address}"
   end
 
-  def add_bouncer(bouncer)
-    key = [bouncer.user.id, bouncer.network.name]
+  def add_bouncer(network_user)
+    unless network_user.user && network_user.network
+      info "Terminating orphan network user #{network_user.inspect}"
+      network_user.destroy
+      return
+    end
+
+    key = bouncers_key(network_user)
     raise("bouncer already exists: #{key}") if @bouncers.include?(key)
-    @bouncers[key] = bouncer
+    @bouncers[key] = Bouncer.new(bouncer)
+  end
+
+  def stop_bouncer(obj)
+    key = bouncers_key(network_user)
+    bouncer = @bouncers.delete(key)
+    if bouncer
+      bouncer.kill!
+    end
   end
 
   def find_bouncer(user, network_name)
@@ -96,12 +107,16 @@ class TkellemServer
       # find the public network with this name, and attempt to auto-add this user to it
       network = Network.first(:conditions => { :user_id => nil, :name => network_name })
       if network
-        nu = NetworkUser.create!(:user => user, :network => network)
+        NetworkUser.create!(:user => user, :network => network)
         # AR callback should create the bouncer in sync
         bouncer = @bouncers[key]
       end
     end
     bouncer
+  end
+
+  def bouncers_key(network_user)
+    [network_user.user_id, network_user.network.name]
   end
 
   class Observer < ActiveRecord::Observer
