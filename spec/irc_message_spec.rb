@@ -45,7 +45,7 @@ describe IrcMessage, "#with_timestamp" do
     timestamp = Time.parse("Thu Nov 29 14:33:20 2001")
     ts_line = line.with_timestamp(timestamp)
     ts_line.should be_a(IrcMessage)
-    ts_line.to_s.should == ":some_long_prefix COMMAND first second :14:33:20> long arg here"
+    ts_line.to_s.should == ":some_long_prefix COMMAND first second :2001-11-29 14:33:20> long arg here"
   end
 end
 
