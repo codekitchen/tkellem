@@ -88,7 +88,6 @@ class Tkellem::Daemon
 
   def start
     trap("INT") { EM.stop }
-    remove_files
     EM.run do
       @admin = EM.start_unix_domain_server(socket_file, Tkellem::SocketServer)
       Tkellem::TkellemServer.new
@@ -103,6 +102,7 @@ class Tkellem::Daemon
     Process.setsid
     exit if fork
     @daemon = true
+    remove_files
     File.open(pid_file, 'wb') { |f| f.write(Process.pid.to_s) }
 
     STDIN.reopen("/dev/null")
