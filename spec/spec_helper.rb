@@ -1,8 +1,13 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 
-require 'tkellem'
 require 'rspec'
+require 'simplecov'
+SimpleCov.start do
+  add_filter "/spec"
+end
+
+require 'tkellem'
 
 Tkellem::EasyLogger.logger = Logger.new("test.log")
 ActiveRecord::Base.logger = Tkellem::EasyLogger.logger
