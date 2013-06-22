@@ -37,6 +37,7 @@ class Tkellem::Daemon
     command = @args.shift
     case command
     when 'start'
+      abort_if_running
       daemonize
       start
     when 'stop'
@@ -135,6 +136,14 @@ class Tkellem::Daemon
       puts "tkellem not running" if print
     end
     pid.to_i > 0 ? pid.to_i : nil
+  end
+
+  def abort_if_running
+    pid = File.read(pid_file) if File.file?(pid_file)
+    if pid.to_i > 0
+      puts "tkellem already running, pid: #{pid}"
+      exit
+    end
   end
 
   def remove_files
