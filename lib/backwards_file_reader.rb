@@ -26,9 +26,10 @@ class BackwardsFileReader
 			return line
 		end
 
+    @read_size = [@read_size, @pos].min
 		@pos -= @read_size
 		@stream.seek(@pos, IO::SEEK_SET)
-		@offset = 0
+		@offset = -@line_buffer.reduce(0) { |n,l| n + l.length }
 
 		@line_buffer[0] = "#{@stream.read(@read_size)}#{@line_buffer[0]}"
 		@line_buffer[0] = @line_buffer[0].scan(%r{.*\n})
