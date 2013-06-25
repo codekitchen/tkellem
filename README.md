@@ -1,5 +1,8 @@
 # tkellem
 
+[![Build
+Status](https://travis-ci.org/codekitchen/tkellem.png)](https://travis-ci.org/codekitchen/tkellem)
+
 tkellem is an IRC bouncer, a proxy that keeps you permanently logged on to an
 IRC server and stores all messages so that when your client next connects, you
 can see the backlog of what happened while you were gone.
