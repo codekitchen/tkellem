@@ -13,7 +13,7 @@ process.
 
 ## IMPORTANT
 
-This is still a pretty early alpha. Expect bugs and missing
+Tkellem is beta quality software. Expect bugs and missing
 functionality.
 
 ## Getting Started
@@ -63,4 +63,5 @@ Upgrading is as simple as:
     $ gem install tkellem
     $ tkellem restart
 
-All active clients will be forced to re-connect.
+All active clients will be forced to re-connect. Their positions in the backlog will not
+be lost, so restarting is relatively painless.
