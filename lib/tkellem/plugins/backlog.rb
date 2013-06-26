@@ -97,7 +97,7 @@ class Backlog
     mode = for_reading ? 'rb' : 'ab'
     ctx = ctx.gsub(%r{[\./\\]}, '')
     path = stream_path(ctx)
-    return unless path.file?
+    return nil if !path.file? && for_reading
     path.open(mode) do |stream|
       if !for_reading
         stream.seek(0, IO::SEEK_END)
