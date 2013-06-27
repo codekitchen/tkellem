@@ -1,3 +1,4 @@
+# encoding: utf-8
 module Tkellem
 
 class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)

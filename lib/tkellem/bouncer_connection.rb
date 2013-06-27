@@ -1,3 +1,4 @@
+# encoding: utf-8
 require 'active_support/core_ext/object/blank'
 
 require 'eventmachine'
@@ -91,6 +92,7 @@ module BouncerConnection
 
   def receive_line(line)
     failsafe("message: {#{line}}") do
+      line.force_encoding Encoding::UTF_8
       trace "from client: #{line}"
       return if line.blank?
       msg = IrcMessage.parse(line)

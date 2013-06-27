@@ -1,3 +1,4 @@
+# encoding: utf-8
 require 'eventmachine'
 require 'active_record'
 require 'rails/observers/activerecord/active_record'

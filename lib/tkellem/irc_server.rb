@@ -1,3 +1,4 @@
+# encoding: utf-8
 require 'eventmachine'
 require 'set'
 require 'socket'
@@ -39,6 +40,7 @@ module IrcServerConnection
 
   def receive_line(line)
     @bouncer.failsafe(:receive_line) do
+      line.force_encoding Encoding::UTF_8
       @bouncer.trace "from server: #{line}"
       return if line.blank?
       msg = IrcMessage.parse(line)

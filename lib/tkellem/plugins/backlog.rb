@@ -1,3 +1,4 @@
+# encoding: utf-8
 require 'backwards_file_reader'
 require 'fileutils'
 require 'pathname'
@@ -94,7 +95,7 @@ class Backlog
   end
 
   def get_stream(ctx, for_reading = false)
-    mode = for_reading ? 'rb' : 'ab'
+    mode = for_reading ? 'rb:utf-8' : 'ab:utf-8'
     ctx = ctx.gsub(%r{[\./\\]}, '')
     path = stream_path(ctx)
     return nil if !path.file? && for_reading
