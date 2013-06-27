@@ -1,19 +1,21 @@
 class BackwardsFileReader
-  def self.scan(stream)
-    scanner = new(stream)
+  def self.scan(stream, *init_args)
+    scanner = new(stream, *init_args)
     while line = scanner.readline
       break unless yield(line)
     end
     scanner.sync
   end
 
-  def initialize(stream)
+  DEFAULT_READ_SIZE = 4096
+
+  def initialize(stream, read_size = DEFAULT_READ_SIZE)
     @stream = stream
     @stream.seek 0, IO::SEEK_END
     @pos = @stream.pos
     @offset = 0
 
-    @read_size = [4096, @pos].min
+    @read_size = [read_size, @pos].min
     @line_buffer = []
   end
 

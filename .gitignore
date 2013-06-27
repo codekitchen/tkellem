@@ -1,8 +1,8 @@
 *.gem
 .bundle
-Gemfile.lock
 pkg/*
 coverage/*
 doc/*
 .yardoc/*
 test.log
+tmp/*
