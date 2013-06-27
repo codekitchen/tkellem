@@ -4,6 +4,13 @@ source "https://rubygems.org"
 gemspec
 
 group :test do
-  gem 'rspec', '~> 2.5'
-  gem 'simplecov'
+  gem 'rspec', '~> 2.13.0'
+  gem 'mocha', '0.14.0', require: false
+  gem 'simplecov', require: false
+  gem 'coveralls', require: false
+end
+
+group :development do
+  gem 'guard-rspec'
+  gem 'rspec-nc'
 end

@@ -2,6 +2,9 @@
 
 [![Build
 Status](https://travis-ci.org/codekitchen/tkellem.png)](https://travis-ci.org/codekitchen/tkellem)
+[![Code Climate](https://codeclimate.com/github/codekitchen/tkellem.png)](https://codeclimate.com/github/codekitchen/tkellem)
+[![Coverage Status](https://coveralls.io/repos/codekitchen/tkellem/badge.png)](https://coveralls.io/r/codekitchen/tkellem)
+
 
 tkellem is an IRC bouncer, a proxy that keeps you permanently logged on to an
 IRC server and stores all messages so that when your client next connects, you
