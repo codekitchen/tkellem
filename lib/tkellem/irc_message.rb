@@ -50,10 +50,6 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
     self.ctcp == 'ACTION'
   end
 
-  def command?(cmd)
-    @command.downcase == cmd.downcase
-  end
-
   def replay
     line = []
     line << ":#{prefix}" unless prefix.nil?
