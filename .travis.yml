@@ -5,4 +5,9 @@ rvm:
   - "2.0.0"
 # uncomment this line if your project needs to run something other than `rake`:
 # script: bundle exec rspec spec
+matrix:
+  allow_failures:
+    # this is intermittently failing with "attempt to unlock a mutex that is not locked" errors
+    # while creating an EM threadpool
+    - rvm: "2.0.0"
 
