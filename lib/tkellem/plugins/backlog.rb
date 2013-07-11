@@ -204,7 +204,7 @@ class Backlog
 
   def send_backlog(conn, ctx_name, stream)
     while line = stream.gets
-      timestamp, msg = parse_line(line, ctx_name)
+      timestamp, msg = self.class.parse_line(line, ctx_name)
       next unless msg
       privmsg = msg.args.first[0] != '#'[0]
       if msg.prefix
@@ -232,7 +232,7 @@ class Backlog
     end
   end
 
-  def parse_line(line, ctx_name)
+  def self.parse_line(line, ctx_name)
     timestamp = Time.parse(line[0, 19])
     case line[20..-1]
     when %r{^> (\* )?(.+)$}
@@ -241,7 +241,7 @@ class Backlog
         msg.ctcp = 'ACTION'
       end
       return timestamp, msg
-    when %r{^< (\* )?([^:]+): (.+)$}
+    when %r{^< (\* )?(.+): (.+)$}
       msg = IrcMessage.new($2, 'PRIVMSG', [ctx_name, $3])
       if $1 == '* '
         msg.ctcp = 'ACTION'
