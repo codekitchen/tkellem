@@ -241,7 +241,7 @@ class Backlog
         msg.ctcp = 'ACTION'
       end
       return timestamp, msg
-    when %r{^< (\* )?(.+): (.+)$}
+    when %r{^< (\* )?([^ ]+): (.+)$}
       msg = IrcMessage.new($2, 'PRIVMSG', [ctx_name, $3])
       if $1 == '* '
         msg.ctcp = 'ACTION'
