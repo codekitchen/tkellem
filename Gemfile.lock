@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    tkellem (0.9.2)
+    tkellem (0.9.3)
       activerecord (~> 4.0.0.rc2)
       eventmachine (~> 1.0.3)
       rails-observers (~> 0.1.1)
