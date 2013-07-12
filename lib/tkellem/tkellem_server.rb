@@ -11,6 +11,7 @@ require 'tkellem/models/host'
 require 'tkellem/models/listen_address'
 require 'tkellem/models/network'
 require 'tkellem/models/network_user'
+require 'tkellem/models/room'
 require 'tkellem/models/setting'
 require 'tkellem/models/user'
 

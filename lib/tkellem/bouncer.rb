@@ -13,8 +13,6 @@ class Bouncer
   cattr_accessor :plugins
   self.plugins = []
 
-  class Room < Struct.new(:name, :topic, :topic_setter, :topic_time); end
-
   def initialize(network_user)
     @network_user = network_user
     @user = network_user.user
@@ -24,7 +22,7 @@ class Bouncer
     # maps { client_conn => state_hash }
     @active_conns = {}
     @welcomes = []
-    @rooms = {}
+    @rooms = Room.where(network_user_id: network_user.id).each_with_object({}) { |room,h| h[room.name] = room }
     # maps { client_conn => away_status_or_nil }
     @away = {}
     # plugin data
@@ -114,10 +112,18 @@ class Bouncer
       ready! if msg.command == "376" # end of MOTD
       false
     when 'JOIN'
-      @rooms[msg.args.first] = Room.new(msg.args.first) if msg.target_user == @nick
+      room_name = msg.args.first
+      if msg.target_user == @nick && !@rooms[room_name]
+        room = Room.create!(network_user_id: network_user.id, name: room_name)
+        @rooms[room_name] = room
+      end
       true
     when 'PART'
-      @rooms.delete(msg.args.first) if msg.target_user == @nick
+      room_name = msg.args.first
+      if msg.target_user == @nick
+        room = @rooms.delete(room_name)
+        room.destroy
+      end
       true
     when 'TOPIC'
       if room = @rooms[msg.args.first]
@@ -223,7 +229,7 @@ class Bouncer
   end
 
   def ready!
-    @rooms.each_key do |room|
+    @rooms.each_value do |room|
       send_msg("JOIN #{room.name}")
     end
 
