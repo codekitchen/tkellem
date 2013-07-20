@@ -95,7 +95,7 @@ class TkellemServer
     @bouncers[key] = Bouncer.new(network_user)
   end
 
-  def stop_bouncer(obj)
+  def stop_bouncer(network_user)
     key = bouncers_key(network_user)
     bouncer = @bouncers.delete(key)
     if bouncer
