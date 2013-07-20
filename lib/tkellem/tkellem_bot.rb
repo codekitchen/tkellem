@@ -9,7 +9,7 @@ class TkellemBot
   # an admin
   def self.run_command(line, bouncer, conn, &block)
     args = Shellwords.shellwords(line)
-    command_name = args.shift.upcase
+    command_name = args.shift.try(:upcase)
     command = commands[command_name]
 
     unless command
