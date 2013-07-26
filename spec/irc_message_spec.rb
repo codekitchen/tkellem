@@ -41,11 +41,20 @@ end
 
 describe IrcMessage, "#with_timestamp" do
   it "should prefix a timestamp to the last arg" do
+    Time.use_zone("EST") do
+      line = IrcMessage.parse(":some_long_prefix COMMAND first second :long arg here")
+      timestamp = Time.parse("2001-11-29T19:33:20Z")
+      ts_line = line.with_timestamp(timestamp)
+      ts_line.should be_a(IrcMessage)
+      ts_line.to_s.should == ":some_long_prefix COMMAND first second :2001-11-29 14:33:20> long arg here"
+    end
+
+    # localtime
     line = IrcMessage.parse(":some_long_prefix COMMAND first second :long arg here")
-    timestamp = Time.parse("Thu Nov 29 14:33:20 2001")
+    timestamp = Time.parse("2001-11-29T19:33:20Z")
     ts_line = line.with_timestamp(timestamp)
     ts_line.should be_a(IrcMessage)
-    ts_line.to_s.should == ":some_long_prefix COMMAND first second :2001-11-29 14:33:20> long arg here"
+    ts_line.to_s.should == ":some_long_prefix COMMAND first second :#{timestamp.strftime("%Y-%m-%d %H:%M:%S")}> long arg here"
   end
 
   it "should not prefix the date if the message is < 24 hours old" do

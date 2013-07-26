@@ -1,4 +1,7 @@
 # encoding: utf-8
+
+require 'active_support/core_ext/time'
+
 module Tkellem
 
 class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
@@ -75,6 +78,17 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
   end
 
   def with_timestamp(timestamp)
+    # TODO: make the time zone configurable per-user, rather than always using
+    # the server's time zone. refs #17
+    # when we do that, we should include a data migration that sets all
+    # existing user's preference to the server's time zone. then we can get rid
+    # of this conditional.
+    if Time.zone
+      timestamp = timestamp.in_time_zone
+    else
+      timestamp = timestamp.localtime
+    end
+
     if timestamp <= 24.hours.ago
       timestring = timestamp.strftime("%Y-%m-%d %H:%M:%S")
     else

@@ -5,6 +5,7 @@ require 'pathname'
 require 'time'
 
 require 'active_support/core_ext/class/attribute_accessors'
+require 'active_support/core_ext/time'
 
 require 'tkellem/irc_message'
 require 'tkellem/tkellem_bot'
@@ -142,6 +143,10 @@ class Backlog
     "backlog:#{@bouncer.log_name}"
   end
 
+  def now_timestamp
+    Time.now.utc.iso8601
+  end
+
   def server_msg(msg)
     case msg.command
     when /3\d\d/, 'JOIN', 'PART'
@@ -154,7 +159,7 @@ class Backlog
         # incoming pm, fake ctx to be the sender's nick
         ctx = msg.prefix.split(/[!~@]/, 2).first
       end
-      write_msg(ctx, Time.now.strftime("%d-%m-%Y %H:%M:%S") + " < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
+      write_msg(ctx, "#{now_timestamp} < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
     end
   end
 
@@ -163,7 +168,7 @@ class Backlog
     when 'PRIVMSG'
       return if msg.ctcp? && !msg.action?
       ctx = msg.args.first
-      write_msg(ctx, Time.now.strftime("%d-%m-%Y %H:%M:%S") + " > #{'* ' if msg.action?}#{msg.args.last}")
+      write_msg(ctx, "#{now_timestamp} > #{'* ' if msg.action?}#{msg.args.last}")
     end
   end
 
@@ -233,15 +238,18 @@ class Backlog
   end
 
   def self.parse_line(line, ctx_name)
-    timestamp = Time.parse(line[0, 19])
+    timestamp = Time.parse(line[0, 20])
+    # older log lines have a timestamp that is one character shorter, which is
+    # why the regular expressions below optionally allow a space in front of
+    # the directional < >
     case line[20..-1]
-    when %r{^> (\* )?(.+)$}
+    when %r{^ ?> (\* )?(.+)$}
       msg = IrcMessage.new(nil, 'PRIVMSG', [ctx_name, $2])
       if $1 == '* '
         msg.ctcp = 'ACTION'
       end
       return timestamp, msg
-    when %r{^< (\* )?([^ ]+): (.+)$}
+    when %r{^ ?< (\* )?([^ ]+): (.+)$}
       msg = IrcMessage.new($2, 'PRIVMSG', [ctx_name, $3])
       if $1 == '* '
         msg.ctcp = 'ACTION'
