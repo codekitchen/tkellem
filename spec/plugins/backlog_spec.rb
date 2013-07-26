@@ -18,5 +18,27 @@ describe Backlog do
       cmp("dude!~dude@12:34:56")
       cmp("dude!~dude@12:34:56", "hey dude: test")
     end
+
+    context "timestamps" do
+      it "should parse legacy timestamps" do
+        Time.use_zone("US/Mountain") do
+          timestamp, msg = Backlog.parse_line(%{10-07-2013 10:10:36 < test: hello}, '#testroom')
+          timestamp.should == Time.zone.parse("10-07-2013 10:10:36")
+          msg.prefix.should == 'test'
+          msg.command.should == 'PRIVMSG'
+          msg.args.should == ['#testroom', 'hello']
+        end
+      end
+
+      it "should parse utc timestamps" do
+        Time.use_zone("US/Mountain") do
+          timestamp, msg = Backlog.parse_line(%{2013-07-26T23:06:10Z < test: hello}, '#testroom')
+          timestamp.should == Time.parse("2013-07-26T23:06:10Z")
+          msg.prefix.should == 'test'
+          msg.command.should == 'PRIVMSG'
+          msg.args.should == ['#testroom', 'hello']
+        end
+      end
+    end
   end
 end
