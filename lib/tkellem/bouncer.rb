@@ -101,6 +101,17 @@ class Bouncer
     if forward
       # send to server
       send_msg(msg)
+
+      # replay to other connected clients
+      if msg.command == "PRIVMSG" && (!msg.ctcp? || msg.action?)
+        msg.readdress_to(nick)
+
+        @active_conns.each do |c,s|
+          next if c == client
+          c.send_msg(msg)
+        end
+      end
+
       flag_for_reply(msg.command, forward) if forward != true
     end
   end
