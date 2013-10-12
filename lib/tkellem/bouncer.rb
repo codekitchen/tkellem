@@ -29,6 +29,7 @@ class Bouncer
     @data = {}
     # clients waiting for us to connect to the irc server
     @waiting_clients = []
+    @awaiting_replies = {}
 
     connect!
   end
@@ -91,6 +92,8 @@ class Bouncer
     when 'NICK'
       @nick = msg.args.last
       true
+    when 'WHO'
+      client
     else
       true
     end
@@ -98,7 +101,12 @@ class Bouncer
     if forward
       # send to server
       send_msg(msg)
+      flag_for_reply(msg.command, forward) if forward != true
     end
+  end
+
+  def flag_for_reply(command, conn)
+    @awaiting_replies[command] = conn
   end
 
   def server_msg(msg)
@@ -154,13 +162,19 @@ class Bouncer
         @nick = msg.args.last
       end
       true
+    when '352'
+      @awaiting_replies['WHO'] || true
+    when '315'
+      @awaiting_replies.delete('WHO') || true
     else
       true
     end
 
-    if forward
+    if forward == true
       # send to clients
       @active_conns.each { |c,s| c.send_msg(msg) }
+    elsif forward && @active_conns.include?(forward)
+      forward.send_msg(msg)
     end
   end
 
