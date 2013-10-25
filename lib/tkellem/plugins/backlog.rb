@@ -1,6 +1,7 @@
 # encoding: utf-8
 require 'backwards_file_reader'
 require 'fileutils'
+require 'geoip'
 require 'pathname'
 require 'time'
 
@@ -45,10 +46,23 @@ class Backlog
     true
   end
 
-
   #### IMPL
 
-  class Device < Struct.new(:network_user, :device_name, :positions)
+  def self.geoip(conn)
+    if !defined?(@geoip)
+      begin
+        @geoip = GeoIP.new('/usr/share/GeoIP/GeoIPCity.dat')
+      rescue Errno::ENOENT
+        @geoip = nil
+      end
+    end
+    geoip_info = @geoip && @geoip.country(Socket.unpack_sockaddr_in(conn.get_peername).last)
+    tz = geoip_info.respond_to?(:timezone) && geoip_info.timezone && ActiveSupport::TimeZone[geoip_info.timezone]
+    country = geoip_info.respond_to?(:country_code2) && geoip_info.country_code2
+    [tz, country]
+  end
+
+  class Device < Struct.new(:network_user, :device_name, :positions, :time_zone, :country)
     def initialize(*a)
       super
       self.positions = {}
@@ -118,6 +132,9 @@ class Backlog
 
   def client_connected(conn)
     device = get_device(conn)
+    tz, country = self.class.geoip(conn)
+    device.time_zone = tz || device.time_zone
+    device.country = country || device.country
     behind = all_existing_ctxs.select do |ctx_name|
       eof = stream_size(ctx_name)
       # default to the end of file, rather than the beginning, for new devices
@@ -184,32 +201,34 @@ class Backlog
       start_pos = device.pos(ctx_name)
       get_stream(ctx_name, true) do |stream|
         stream.seek(start_pos)
-        send_backlog(conn, ctx_name, stream)
+        send_backlog(conn, ctx_name, stream, device.time_zone)
         device.update_pos(ctx_name, stream.pos)
       end
     end
   end
 
   def send_backlog_since(conn, start_time, contexts)
-    debug "scanning for backlog from #{start_time.inspect}"
+    debug "scanning for backlog from #{start_time.iso8601}"
     contexts.each do |ctx_name|
       get_stream(ctx_name, true) do |stream|
         last_line_len = 0
         BackwardsFileReader.scan(stream) do |line|
           # remember this last line length so we can scan past it
           last_line_len = line.length
-          timestamp = Time.parse(line[0,19]) rescue nil
+          timestamp = Time.parse(line[0,20]) rescue nil
           !timestamp || timestamp >= start_time
         end
         stream.seek(last_line_len, IO::SEEK_CUR)
-        send_backlog(conn, ctx_name, stream)
+        send_backlog(conn, ctx_name, stream, get_device(conn).time_zone)
       end
     end
   end
 
-  def send_backlog(conn, ctx_name, stream)
+  def send_backlog(conn, ctx_name, stream, time_zone)
     while line = stream.gets
       timestamp, msg = self.class.parse_line(line, ctx_name)
+      timestamp = timestamp.in_time_zone(time_zone) if timestamp && time_zone
+      timestamp = timestamp.localtime if timestamp && !time_zone
       next unless msg
       privmsg = msg.args.first[0] != '#'[0]
       if msg.prefix
@@ -280,6 +299,46 @@ class BacklogCommand < TkellemBot::Command
       rooms = backlog.all_existing_ctxs
     end
     backlog.send_backlog_since(conn, cutoff, rooms)
+  end
+end
+
+class TimezoneCommand < TkellemBot::Command
+  register 'timezone'
+
+  def self.admin_only?
+    false
+  end
+
+  def execute
+    backlog = Backlog.get_instance(bouncer)
+    device = backlog.get_device(conn)
+
+    if !args.empty?
+      arg = args.join(' ')
+      tz = ActiveSupport::TimeZone[arg]
+      if !tz
+        conn.say_as_tkellem "Unknown time zone '#{arg}'; please use an IANA time zone"
+        return
+      end
+      device.time_zone = tz
+    end
+
+    if !device.time_zone
+      conn.say_as_tkellem "<time zone not set; using #{Time.now.zone}>"
+      return
+    end
+
+    # try to find a friendlier name to show the user
+    begin
+      country_zone = TZInfo::Country.get(device.country).zone_info.detect { |z| z.identifier == device.time_zone.name }
+      if country_zone
+        conn.say_as_tkellem country_zone.description_or_friendly_identifier
+        return
+      end
+    rescue TZInfo::InvalidCountryCode
+    end
+
+    conn.say_as_tkellem device.time_zone.tzinfo.friendly_identifier
   end
 end
 

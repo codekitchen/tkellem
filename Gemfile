@@ -13,4 +13,5 @@ end
 group :development do
   gem 'guard-rspec'
   gem 'rspec-nc'
+  gem 'debugger'
 end
