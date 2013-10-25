@@ -45,6 +45,21 @@ module BouncerConnection
   def ssl_handshake_completed
   end
 
+  def schedule_ping_client
+    EM::Timer.new(60) { ping_client }
+  end
+
+  def ping_client
+    failsafe("ping_client") do
+      send_msg("PING tkellem")
+      @ping_timer = EM::Timer.new(10) do
+        # ping timeout
+        info("PING timeout, closing connection")
+        close_connection
+      end
+    end
+  end
+
   def error!(msg)
     info("ERROR :#{msg}")
     say_as_tkellem(msg)
@@ -57,6 +72,7 @@ module BouncerConnection
     return error!("Unknown connection: #{@conn_name}") unless @bouncer
     @state = :connected
     info "connected"
+    schedule_ping_client
     @bouncer.connect_client(self)
   end
 
@@ -102,6 +118,14 @@ module BouncerConnection
         msg_tkellem(IrcMessage.new(nil, 'TKELLEM', [msg.args.last]))
       elsif command == 'TKELLEM' || command == 'TK'
         msg_tkellem(msg)
+      elsif command == 'PONG'
+        if @ping_timer
+          @ping_timer.cancel
+          @ping_timer = nil
+          # only schedule again if @ping_timer existed, so we don't schedule
+          # multiple if the client just randomly sends PONGs
+          schedule_ping_client
+        end
       elsif command == 'CAP'
         # TODO: full support for CAP -- this just gets mobile colloquy connecting
         if msg.args.first =~ /req/i
