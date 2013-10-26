@@ -94,7 +94,7 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
   def readdress_to(nick)
     privmsg = args.first[0] != '#'[0]
 
-    if msg.prefix
+    if prefix
       # to this user
       if privmsg
         args[0] = nick
@@ -107,9 +107,9 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
         # a one-on-one chat -- every client i've seen doesn't know how to
         # display messages from themselves here, so we fake it by just
         # adding an arrow and pretending the other user said it. shame.
-        prefix = msg.args.first
+        prefix = args.first
         args[0] = nick
-        args[-1] = "-> #{msg.args.last}"
+        args[-1] = "-> #{args.last}"
       else
         # it's a room, we can just replay
         prefix = nick
