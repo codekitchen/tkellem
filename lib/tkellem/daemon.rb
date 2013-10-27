@@ -31,7 +31,9 @@ class Tkellem::Daemon
       opts.on("-p", "--path", "Use alternate folder for tkellem data (default #{options[:path]})") { |p| options[:path] = p }
       opts.on_tail("-h", "--help", "Show this message") { puts opts; exit }
     end
-    op.parse!(@args)
+    unless @args.first == 'admin'
+      op.parse!(@args)
+    end
 
     FileUtils.mkdir_p(path)
     File.chmod(0700, path)
