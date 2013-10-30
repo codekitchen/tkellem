@@ -107,12 +107,12 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
         # a one-on-one chat -- every client i've seen doesn't know how to
         # display messages from themselves here, so we fake it by just
         # adding an arrow and pretending the other user said it. shame.
-        prefix = args.first
+        self.prefix = args.first
         args[0] = nick
         args[-1] = "-> #{args.last}"
       else
         # it's a room, we can just replay
-        prefix = nick
+        self.prefix = nick
       end
     end
   end
