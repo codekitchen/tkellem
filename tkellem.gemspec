@@ -16,6 +16,7 @@ Gem::Specification.new do |s|
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.default_executable = %q{tkellem}
   s.require_paths = ["lib"]
+  s.license       = 'MIT'
 
   s.add_dependency "eventmachine", "~> 1.0.3"
   s.add_dependency "activerecord", "~> 4.0.0.rc2"
