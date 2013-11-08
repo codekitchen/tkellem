@@ -35,7 +35,10 @@ module BouncerConnection
   def post_init
     failsafe(:post_init) do
       if ssl
-        start_tls :verify_peer => false
+        options = { verify_peer: false }
+        options[:private_key_file] = Setting.get('private_key_file').presence
+        options[:cert_chain_file] = Setting.get('cert_chain_file').presence
+        start_tls options
       else
         ssl_handshake_completed
       end

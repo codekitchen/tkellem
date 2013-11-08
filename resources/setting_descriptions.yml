@@ -18,3 +18,11 @@ recaptcha_api_key:
 allow_user_networks:
   help: |+
     If 'true', allow users to create their own networks with the `/tkellem network` command. Otherwise, users can only join admin-created public networks.
+
+private_key_file:
+  help: |+
+    Path to private key for SSL certificate
+
+cert_chain_file:
+  help: |+
+    Path to certificate chain for SSL certificate
