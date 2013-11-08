@@ -25,7 +25,7 @@ class TkellemServer
 
   attr_reader :bouncers
 
-  def initialize
+  def initialize(path = "~/.tkellem")
     @listeners = {}
     @bouncers = {}
     $tkellem_server = self
@@ -33,7 +33,7 @@ class TkellemServer
     unless ActiveRecord::Base.connected?
       ActiveRecord::Base.establish_connection({
         :adapter => 'sqlite3',
-        :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
+        :database => File.join(path, "tkellem.sqlite3"),
       })
       ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
     end
