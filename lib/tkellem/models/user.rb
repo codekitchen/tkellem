@@ -18,7 +18,7 @@ class User < ActiveRecord::Base
   # default database-based authentication
   # TODO: proper password hashing
   self.authentication_methods << proc do |username, password|
-    user = find_by_username(username)
+    user = where(username: username).first
     user && user.valid_password?(password) && user
   end
 

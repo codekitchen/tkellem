@@ -430,7 +430,7 @@ class TkellemBot
         r "Settings:"
         Setting.all.each { |s| r "    #{s}" }
       when 1
-        setting = Setting.find_by_name(args.first)
+        setting = Setting.where(name: args.first).first
         if setting
           r(setting.to_s)
           desc = self.class.setting_resources(setting.name)

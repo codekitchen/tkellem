@@ -2,12 +2,12 @@ module Tkellem
 
 class Setting < ActiveRecord::Base
   def self.get(setting_name)
-    setting = first(:conditions => { :name => setting_name })
+    setting = where(name: setting_name).first
     setting.try(:value)
   end
 
   def self.set(setting_name, new_value)
-    setting = first(:conditions => { :name => setting_name })
+    setting = where(name: setting_name).first
     setting.try(:update_attributes, :value => new_value.to_s, :unchanged => false)
     setting
   end

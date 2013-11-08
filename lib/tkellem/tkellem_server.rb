@@ -108,7 +108,7 @@ class TkellemServer
     bouncer = @bouncers[key]
     if !bouncer
       # find the public network with this name, and attempt to auto-add this user to it
-      network = Network.first(:conditions => { :user_id => nil, :name => network_name })
+      network = Network.where(user_id: nil, name: network_name).first
       if network
         NetworkUser.create!(:user => user, :network => network)
         # AR callback should create the bouncer in sync
