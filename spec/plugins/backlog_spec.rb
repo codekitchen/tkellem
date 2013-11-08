@@ -39,6 +39,16 @@ describe Backlog do
           msg.args.should == ['#testroom', 'hello']
         end
       end
+
+      it "should parse fractional timestamps" do
+        Time.use_zone("US/Mountain") do
+          timestamp, msg = Backlog.parse_line(%{2013-07-26T23:06:10.345Z < test: hello}, '#testroom')
+          timestamp.should == Time.parse("2013-07-26T23:06:10.345Z")
+          msg.prefix.should == 'test'
+          msg.command.should == 'PRIVMSG'
+          msg.args.should == ['#testroom', 'hello']
+        end
+      end
     end
   end
 end
