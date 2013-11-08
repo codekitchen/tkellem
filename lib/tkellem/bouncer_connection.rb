@@ -173,7 +173,7 @@ module BouncerConnection
         connect_to_tkellem_console
       end
     else
-      user = User.find_by_username(@username)
+      user = User.where(username: @username).first
       if user || user_registration == 'closed'
         error!("No password given. Make sure to set your password in your IRC client config, and connect again.")
         if user_registration != 'closed'
