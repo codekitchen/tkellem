@@ -59,61 +59,51 @@ module IrcServerConnection
     end
   end
 
-  class ConnectionState < Struct.new(:bouncer, :network, :attempted, :getting)
+  class ConnectionState < Struct.new(:bouncer, :network, :to_try, :getting)
     def initialize(bouncer, network)
-      super(bouncer, network, Set.new, false)
-      reset
+      super(bouncer, network, nil, false)
     end
 
     def connect!
-      raise("already in the process of getting an address") if getting
-      self.getting = true
-      network.reload
-      host_infos = network.hosts.map { |h| h.attributes }
-      EM.defer(proc { find_address(host_infos) }, method(:got_address))
-    end
+      if !to_try.nil? && !to_try.empty?
+        address, port, ssl, af = to_try.shift
+        friendly_address = af == 'AF_INET6' ? "[#{address}]" : address
 
-    def reset
-      self.attempted.clear
+        bouncer.debug "Connecting to: #{Host.address_string(friendly_address, port, ssl)}"
+        bouncer.failsafe("connect: #{Host.address_string(friendly_address, port, ssl)}") do
+          EM.connect(address, port, IrcServerConnection, self, bouncer, ssl)
+        end
+      elsif !to_try.nil?
+        # sleep for a bit and try again
+        bouncer.debug "All available addresses failed, sleeping 5s and then trying over"
+        self.to_try = nil
+        EM.add_timer(5) { connect! }
+      else
+        raise("already in the process of getting an address") if getting
+        self.getting = true
+        network.reload
+        host_infos = network.hosts.map(&:attributes)
+        EM.defer(proc { find_address(host_infos) }, method(:got_address))
+      end
     end
 
     # runs in threadpool
     def find_address(hosts)
       candidates = Set.new
       hosts.each do |host|
-        Socket.getaddrinfo(host['address'], host['port'], Socket::AF_INET, Socket::SOCK_STREAM, Socket::IPPROTO_TCP).each do |found|
-          candidates << [found[3], host['port'], host['ssl']]
+        Socket.getaddrinfo(host['address'], host['port'], Socket::AF_UNSPEC, Socket::SOCK_STREAM, Socket::IPPROTO_TCP).each do |found|
+          candidates << [found[3], host['port'], host['ssl'], found[0]]
         end
       end
 
-      to_try = candidates.to_a.sort_by { rand }.find { |c| !attempted.include?(c) }
-      if to_try.nil?
-        # we've tried all possible hosts, start over
-        return nil
-      end
-
-      return to_try
+      # prefer IPv6; if no IPv6 connectivity, they'll fail fast
+      self.to_try = candidates.to_a.sort_by { |c| [c.last == 'AF_INET6' ? 0 : 1, rand] }
     end
 
     # back on event thread
-    def got_address(to_try)
+    def got_address(_)
       self.getting = false
-
-      if !to_try
-        # sleep for a bit and try again
-        bouncer.debug "All available addresses failed, sleeping 5s and then trying over"
-        reset
-        EM.add_timer(5) { connect! }
-        return
-      end
-
-      attempted << to_try
-      address, port, ssl = to_try
-
-      bouncer.debug "Connecting to: #{Host.address_string(address, port, ssl)}"
-      bouncer.failsafe("connect: #{Host.address_string(address, port, ssl)}") do
-        EM.connect(address, port, IrcServerConnection, self, bouncer, ssl)
-      end
+      connect!
     end
   end
 

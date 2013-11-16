@@ -3,7 +3,7 @@ PATH
   specs:
     tkellem (0.9.7)
       activerecord (~> 4.0.1)
-      eventmachine (~> 1.0.3)
+      eventmachine-le (~> 1.1.6)
       geoip (~> 1.3.2)
       rails-observers (~> 0.1.1)
       sqlite3 (~> 1.3.3)
@@ -47,7 +47,7 @@ GEM
     debugger-linecache (1.2.0)
     debugger-ruby_core_source (1.2.3)
     diff-lcs (1.2.4)
-    eventmachine (1.0.3)
+    eventmachine-le (1.1.6)
     ffi (1.9.3)
     formatador (0.2.4)
     geoip (1.3.3)

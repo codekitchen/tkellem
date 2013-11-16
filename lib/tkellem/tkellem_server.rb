@@ -68,8 +68,13 @@ class TkellemServer
 
   def listen(listen_address)
     info "Listening on #{listen_address}"
+    address = listen_address.address
+    # IPv6 literal
+    if address[0] == '[' && address[-1] == ']'
+      address = address[1..-2]
+    end
 
-    @listeners[listen_address.id] = EM.start_server(listen_address.address,
+    @listeners[listen_address.id] = EM.start_server(address,
                                                     listen_address.port,
                                                     BouncerConnection,
                                                     self,
