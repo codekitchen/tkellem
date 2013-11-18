@@ -9,14 +9,15 @@ module Tkellem
 class Bouncer
   include Tkellem::EasyLogger
 
-  attr_reader :user, :network, :nick, :network_user, :connected_at
+  attr_reader :user, :network, :nick, :network_user, :connected_at, :path
   cattr_accessor :plugins
   self.plugins = []
 
-  def initialize(network_user)
+  def initialize(network_user, path)
     @network_user = network_user
     @user = network_user.user
     @network = network_user.network
+    @path = path
 
     @nick = network_user.nick
     # maps { client_conn => state_hash }
