@@ -13,7 +13,7 @@ class Bouncer
   cattr_accessor :plugins
   self.plugins = []
 
-  def initialize(network_user, path)
+  def initialize(network_user, path = "~/.tkellem")
     @network_user = network_user
     @user = network_user.user
     @network = network_user.network
