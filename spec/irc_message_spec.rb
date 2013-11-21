@@ -6,8 +6,9 @@ include Tkellem
 
 describe IrcMessage, ".parse" do
   it "should parse complex irc lines" do
-    orig = ":some_long_prefix COMMAND first second :long arg here"
+    orig = "@tag;tag2=b :some_long_prefix COMMAND first second :long arg here"
     line = IrcMessage.parse(orig)
+    line.tags.should == { 'tag' => nil, 'tag2' => 'b' }
     line.command.should == 'COMMAND'
     line.prefix.should == 'some_long_prefix'
     line.args.size.should == 3

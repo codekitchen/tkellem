@@ -20,12 +20,14 @@ module BouncerConnection
     @name = 'new-conn'
     @data = {}
     @connected_at = Time.now
+    @caps = Set.new
+    @tags = false
   end
-  attr_reader :ssl, :bouncer, :name, :device_name, :connecting_nick, :connected_at
+  attr_reader :ssl, :bouncer, :name, :device_name, :connecting_nick, :connected_at, :caps, :tags
   alias_method :log_name, :name
 
   def nick
-    @bouncer ? @bouncer.nick : @connecting_nick
+    @bouncer ? @bouncer.nick : @connecting_nick || '*'
   end
 
   def data(key)
@@ -114,6 +116,22 @@ module BouncerConnection
     send_msg(":-tkellem!~tkellem@tkellem PRIVMSG #{nick} :#{message}")
   end
 
+  def self.caps
+    @caps ||= Set.new
+  end
+  def self.tag_caps
+    @tag_caps ||= Set.new
+  end
+
+  def self.register_cap(*caps)
+    self.caps.merge(caps)
+  end
+
+  def self.register_tag_cap(*caps)
+    self.tag_caps.merge(caps)
+    self.caps.merge(caps)
+  end
+
   def receive_line(line)
     failsafe("message: {#{line}}") do
       line.force_encoding Encoding::UTF_8
@@ -135,9 +153,36 @@ module BouncerConnection
           schedule_ping_client
         end
       elsif command == 'CAP'
-        # TODO: full support for CAP -- this just gets mobile colloquy connecting
-        if msg.args.first =~ /req/i
-          send_msg("CAP NAK")
+        case msg.args.first
+        when 'LS'
+          send_msg("CAP #{nick} LS :#{BouncerConnection.caps.to_a.join(' ')}")
+        when 'REQ'
+          reqs = msg.args.last.split(' ')
+          adds = []; removes = []
+          reqs.each do |req|
+            if req[0] == '-'
+              removes << req[1..-1]
+            else
+              adds << req
+            end
+          end
+          if !(adds - BouncerConnection.caps.to_a).empty? || !(removes - BouncerConnection.caps.to_a).empty?
+            send_msg("CAP #{nick} NAK :#{msg.args.last}")
+          else
+            @caps += adds
+            @caps -= removes
+            @tags = !(@caps & BouncerConnection.tag_caps).empty?
+            send_msg("CAP #{nick} ACK :#{msg.args.last}")
+          end
+        when 'LIST'
+          send_msg("CAP #{nick} LIST :#{caps.to_a.join(' ')}")
+        when 'CLEAR'
+          @tags = false
+          send_msg("CAP #{nick} ACK :#{caps.map { |cap| "-#{cap}" }.join(' ') }")
+        when 'END'
+          # do nothing
+        else
+          error!("Unrecognized CAP subcommand")
         end
       elsif command == 'PASS' && @state == :auth
         @password = msg.args.first
@@ -237,6 +282,10 @@ module BouncerConnection
 
   def send_msg(msg)
     trace "to client: #{msg}"
+    if !tags && msg.is_a?(IrcMessage) && !msg.tags.empty?
+      msg = msg.dup
+      msg.tags = {}
+    end
     send_data("#{msg}\r\n")
   end
 
