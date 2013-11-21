@@ -32,10 +32,18 @@ module BouncerConnection
     @data[key] ||= {}
   end
 
+  def start_tls
+    @ssl = true
+    options = { verify_peer: false }
+    options[:private_key_file] = Setting.get('private_key_file').presence
+    options[:cert_chain_file] = Setting.get('cert_chain_file').presence
+    super options
+  end
+
   def post_init
     failsafe(:post_init) do
       if ssl
-        start_tls :verify_peer => false
+        start_tls
       else
         ssl_handshake_completed
       end
@@ -143,6 +151,11 @@ module BouncerConnection
           @username, @conn_info = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
         end
         maybe_connect
+      elsif command == 'STARTTLS' && !@ssl
+        send_msg("670 :STARTTLS successful, go ahead with TLS handshake")
+        start_tls
+      elsif command == 'PING' && @state == :auth
+        send_msg("PONG #{args.first}")
       elsif @state == :auth
         error!("Protocol error. You must authenticate first.")
       elsif @state == :connected
