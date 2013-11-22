@@ -132,6 +132,8 @@ module BouncerConnection
     self.caps.merge(caps)
   end
 
+  register_cap 'tls'
+
   def receive_line(line)
     failsafe("message: {#{line}}") do
       line.force_encoding Encoding::UTF_8
