@@ -4,15 +4,16 @@ require 'active_support/core_ext/time'
 
 module Tkellem
 
-class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
-  RE = %r{(:[^ ]+ )?([^ ]*)(.*)}i
+class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp, :tags)
+  RE = %r{(?:@([^ ]*) )?(:[^ ]+ )?([^ ]*)(.*)}i
 
   def self.parse(line)
     md = RE.match(line) or raise("invalid input: #{line.inspect}")
 
-    prefix = md[1] && md[1][1..-1].strip
-    command = md[2].upcase
-    args = md[3]
+    tags = md[1]
+    prefix = md[2] && md[2][1..-1].strip
+    command = md[3].upcase
+    args = md[4]
 
     args.strip!
     idx = args.index(":")
@@ -27,6 +28,10 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
     if args.last && args.last.match(%r{#{"\x01"}([^ ]+)([^\1]*)#{"\x01"}})
       msg.ctcp = $1.upcase
       msg.args[-1] = $2.strip
+    end
+
+    if tags
+      msg.tags = Hash[tags.split(';').map { |tag| tag.split('=') }]
     end
 
     msg
@@ -46,6 +51,12 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
     msg
   end
 
+  def initialize(*args)
+    super
+    self.tags ||= {}
+    self.args ||= []
+  end
+
   def ctcp?
     self.ctcp.present?
   end
@@ -56,6 +67,10 @@ class IrcMessage < Struct.new(:prefix, :command, :args, :ctcp)
 
   def replay
     line = []
+
+    if !tags.empty?
+      line << "@#{tags.map { |k, v| v.nil? ? k : "#{k}=#{v}"}.join(';') }"
+    end
     line << ":#{prefix}" unless prefix.nil?
     line << command
     ext_arg = args.last if args.last && args.last.match(%r{^:|\s})

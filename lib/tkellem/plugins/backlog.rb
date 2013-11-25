@@ -23,6 +23,8 @@ class Backlog
   include Tkellem::EasyLogger
 
   Bouncer.add_plugin(self)
+  SERVER_TIME_CAPS = %w{server-time znc.in/server-time-iso}.freeze
+  BouncerConnection.register_tag_cap(*SERVER_TIME_CAPS)
   cattr_accessor :instances
 
   def self.get_instance(bouncer)
@@ -161,7 +163,7 @@ class Backlog
   end
 
   def now_timestamp
-    Time.now.utc.iso8601
+    Time.now.utc.iso8601(3)
   end
 
   def server_msg(msg)
@@ -176,6 +178,7 @@ class Backlog
         # incoming pm, fake ctx to be the sender's nick
         ctx = msg.prefix.split(/[!~@]/, 2).first
       end
+      msg.tags[:time] ||= now_timestamp
       write_msg(ctx, "#{now_timestamp} < #{'* ' if msg.action?}#{msg.prefix}: #{msg.args.last}")
     end
   end
@@ -208,14 +211,14 @@ class Backlog
   end
 
   def send_backlog_since(conn, start_time, contexts)
-    debug "scanning for backlog from #{start_time.iso8601}"
+    debug "scanning for backlog from #{start_time.iso8601(3)}"
     contexts.each do |ctx_name|
       get_stream(ctx_name, true) do |stream|
         last_line_len = 0
         BackwardsFileReader.scan(stream) do |line|
           # remember this last line length so we can scan past it
           last_line_len = line.length
-          timestamp = Time.parse(line[0,20]) rescue nil
+          timestamp, _ = (self.class.parse_line(line, nil, timestamp_only: true) rescue [nil, nil])
           !timestamp || timestamp >= start_time
         end
         stream.seek(last_line_len, IO::SEEK_CUR)
@@ -227,27 +230,34 @@ class Backlog
   def send_backlog(conn, ctx_name, stream, time_zone)
     while line = stream.gets
       timestamp, msg = self.class.parse_line(line, ctx_name)
-      timestamp = timestamp.in_time_zone(time_zone) if timestamp && time_zone
-      timestamp = timestamp.localtime if timestamp && !time_zone
       next unless msg
       msg.readdress_to(@bouncer.nick)
-      conn.send_msg(msg.with_timestamp(timestamp))
+      if !(conn.caps & SERVER_TIME_CAPS).empty?
+        msg.tags[:time] = timestamp.utc.iso8601(3)
+      else
+        timestamp = timestamp.in_time_zone(time_zone) if timestamp && time_zone
+        timestamp = timestamp.localtime if timestamp && !time_zone
+        msg = msg.with_timestamp(timestamp)
+      end
+      conn.send_msg(msg)
     end
   end
 
-  def self.parse_line(line, ctx_name)
-    timestamp = Time.parse(line[0, 20])
-    # older log lines have a timestamp that is one character shorter, which is
-    # why the regular expressions below optionally allow a space in front of
-    # the directional < >
-    case line[20..-1]
-    when %r{^ ?> (\* )?(.+)$}
+  def self.parse_line(line, ctx_name, options = {})
+    space = line.index(' ')
+    timestamp = Time.parse(line[0, space])
+    if options[:timestamp_only]
+      return timestamp, nil
+    end
+
+    case line[space + 1..-1]
+    when %r{^> (\* )?(.+)$}
       msg = IrcMessage.new(nil, 'PRIVMSG', [ctx_name, $2])
       if $1 == '* '
         msg.ctcp = 'ACTION'
       end
       return timestamp, msg
-    when %r{^ ?< (\* )?([^ ]+): (.+)$}
+    when %r{^< (\* )?([^ ]+): (.+)$}
       msg = IrcMessage.new($2, 'PRIVMSG', [ctx_name, $3])
       if $1 == '* '
         msg.ctcp = 'ACTION'

@@ -105,11 +105,11 @@ class TkellemServer
   end
 
   def find_bouncer(user, network_name)
-    key = [user.id, network_name]
+    key = [user.id, network_name.downcase]
     bouncer = @bouncers[key]
     if !bouncer
       # find the public network with this name, and attempt to auto-add this user to it
-      network = Network.where(user_id: nil, name: network_name).first
+      network = Network.where("user_id IS NULL AND LOWER(name)=LOWER(?)", network_name).first
       if network
         NetworkUser.create!(:user => user, :network => network)
         # AR callback should create the bouncer in sync
@@ -120,7 +120,7 @@ class TkellemServer
   end
 
   def bouncers_key(network_user)
-    [network_user.user_id, network_user.network.name]
+    [network_user.user_id, network_user.network.name.downcase]
   end
 
   class Observer < ActiveRecord::Observer

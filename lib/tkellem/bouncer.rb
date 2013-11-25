@@ -26,6 +26,7 @@ class Bouncer
     @rooms = Room.where(network_user_id: network_user.id).each_with_object({}) { |room,h| h[room.name] = room }
     # maps { client_conn => away_status_or_nil }
     @away = {}
+    @server_away = nil
     # plugin data
     @data = {}
     # clients waiting for us to connect to the irc server
@@ -197,10 +198,12 @@ class Bouncer
     # by clients
     if @away.any? { |k,v| !v }
       # we have a client who isn't away
-      send_msg("AWAY")
+      send_msg("AWAY") if @server_away
+      @server_away = nil
     else
       message = @away.values.first || "Away"
-      send_msg("AWAY :#{message}")
+      send_msg("AWAY :#{message}") if @server_away != message
+      @server_away = message
     end
   end
 

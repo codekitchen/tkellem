@@ -308,7 +308,7 @@ class TkellemBot
 
     def execute
       if opts['network'].present? # only settable by admins
-        target = Network.where(["name = ? AND user_id IS NULL", opts['network'].downcase]).first
+        target = Network.where(["LOWER(name) = LOWER(?) AND user_id IS NULL", opts['network']]).first
       else
         target = bouncer.try(:network_user)
       end
@@ -367,8 +367,8 @@ class TkellemBot
       end
 
       if opts['network'].present?
-        target = Network.where(["name = ? AND user_id = ?", opts['network'].downcase, user.try(:id)]).first
-        target ||= Network.where(["name = ? AND user_id IS NULL", opts['network'].downcase]).first if self.class.admin_user?(user)
+        target = Network.where(["LOWER(name) = LOWER(?) AND user_id = ?", opts['network'], user.try(:id)]).first
+        target ||= Network.where(["LOWER(name) = LOWER(?) AND user_id IS NULL", opts['network']]).first if self.class.admin_user?(user)
       else
         target = bouncer.try(:network)
         if target && target.public? && !self.class.admin_user?(user)
