@@ -28,7 +28,7 @@ class Backlog
   cattr_accessor :instances
 
   def self.get_instance(bouncer)
-    bouncer.data(self)[:instance] ||= self.new(bouncer)
+    bouncer.data(self)[:instance] ||= self.new(bouncer, bouncer.path)
   end
 
   def self.new_client_connected(bouncer, client)
@@ -95,11 +95,11 @@ class Backlog
     end
   end
 
-  def initialize(bouncer)
+  def initialize(bouncer, path = "~/.tkellem")
     @bouncer = bouncer
     @network_user = bouncer.network_user
     @devices = {}
-    @dir = Pathname.new(File.expand_path("~/.tkellem/logs/#{bouncer.user.username}/#{bouncer.network.name}"))
+    @dir = Pathname.new(File.join(path, "logs/#{bouncer.user.username}/#{bouncer.network.name}"))
     @dir.mkpath()
   end
 

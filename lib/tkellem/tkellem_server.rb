@@ -25,15 +25,16 @@ class TkellemServer
 
   attr_reader :bouncers
 
-  def initialize
+  def initialize(path = "~/.tkellem")
     @listeners = {}
     @bouncers = {}
+    @path = path
     $tkellem_server = self
 
     unless ActiveRecord::Base.connected?
       ActiveRecord::Base.establish_connection({
         :adapter => 'sqlite3',
-        :database => File.expand_path("~/.tkellem/tkellem.sqlite3"),
+        :database => File.join(path, "tkellem.sqlite3"),
       })
       ActiveRecord::Migrator.migrate(File.expand_path("../migrations", __FILE__), nil)
     end
@@ -92,7 +93,7 @@ class TkellemServer
 
     key = bouncers_key(network_user)
     raise("bouncer already exists: #{key}") if @bouncers.include?(key)
-    @bouncers[key] = Bouncer.new(network_user)
+    @bouncers[key] = Bouncer.new(network_user, @path)
   end
 
   def stop_bouncer(network_user)

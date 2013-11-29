@@ -28,13 +28,11 @@ class Tkellem::Daemon
 }
 
       opts.separator "\n<options>"
-      opts.on("-p", "--path", "Use alternate folder for tkellem data (default #{options[:path]})") { |p| options[:path] = p }
+      opts.on("-p", "--path PATH", "Use alternate folder for tkellem data (default #{options[:path]})") { |p| options[:path] = File.expand_path(p) }
       opts.on("--trace", "Enable trace logging") { Tkellem::EasyLogger.trace = true }
       opts.on_tail("-h", "--help", "Show this message") { puts opts; exit }
     end
-    unless @args.first == 'admin'
-      op.parse!(@args)
-    end
+    op.parse!(@args)
 
     FileUtils.mkdir_p(path)
     File.chmod(0700, path)
@@ -94,7 +92,7 @@ class Tkellem::Daemon
     trap("INT") { EM.stop }
     EM.run do
       @admin = EM.start_unix_domain_server(socket_file, Tkellem::SocketServer)
-      Tkellem::TkellemServer.new
+      Tkellem::TkellemServer.new(path)
     end
   ensure
     remove_files
