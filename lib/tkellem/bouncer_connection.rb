@@ -1,8 +1,12 @@
 # encoding: utf-8
 require 'active_support/core_ext/object/blank'
 
+require 'base64'
 require 'eventmachine'
 require 'tkellem/irc_message'
+require 'tkellem/sasl/plain'
+require 'tkellem/sasl/dh_aes'
+require 'tkellem/sasl/dh_blowfish'
 
 module Tkellem
 
@@ -133,6 +137,38 @@ module BouncerConnection
   end
 
   register_cap 'tls'
+  register_cap 'sasl'
+
+  def self.sasl_mechanisms
+    @sasl_mechanisms ||= {}
+  end
+  def self.register_sasl(mechanism, klass)
+    sasl_mechanisms[mechanism] = klass
+  end
+
+  module TkellemSaslAuthenticate
+    def authenticate
+      return false unless authcid
+      username, _, _ = BouncerConnection.parse_username(authcid)
+
+      !!User.authenticate(username, passwd)
+    end
+  end
+
+  class TkellemPlainSasl < SASL::Plain
+    include TkellemSaslAuthenticate
+  end
+  register_sasl('PLAIN', TkellemPlainSasl)
+
+  class TkellemDhBlowfishSasl < SASL::DhBlowfish
+    include TkellemSaslAuthenticate
+  end
+  register_sasl('DH-BLOWFISH', TkellemDhBlowfishSasl)
+
+  class TkellemDhAesSasl < SASL::DhAes
+    include TkellemSaslAuthenticate
+  end
+  register_sasl('DH-AES', TkellemDhAesSasl)
 
   def receive_line(line)
     failsafe("message: {#{line}}") do
@@ -157,7 +193,7 @@ module BouncerConnection
       elsif command == 'CAP'
         case msg.args.first
         when 'LS'
-          send_msg("CAP #{nick} LS :#{BouncerConnection.caps.to_a.join(' ')}")
+          send_msg(":tkellem CAP #{nick} LS :#{BouncerConnection.caps.to_a.join(' ')}")
         when 'REQ'
           reqs = msg.args.last.split(' ')
           adds = []; removes = []
@@ -169,18 +205,18 @@ module BouncerConnection
             end
           end
           if !(adds - BouncerConnection.caps.to_a).empty? || !(removes - BouncerConnection.caps.to_a).empty?
-            send_msg("CAP #{nick} NAK :#{msg.args.last}")
+            send_msg(":tkellem CAP #{nick} NAK :#{msg.args.last}")
           else
             @caps += adds
             @caps -= removes
             @tags = !(@caps & BouncerConnection.tag_caps).empty?
-            send_msg("CAP #{nick} ACK :#{msg.args.last}")
+            send_msg(":tkellem CAP #{nick} ACK :#{msg.args.last}")
           end
         when 'LIST'
-          send_msg("CAP #{nick} LIST :#{caps.to_a.join(' ')}")
+          send_msg(":tkellem CAP #{nick} LIST :#{caps.to_a.join(' ')}")
         when 'CLEAR'
           @tags = false
-          send_msg("CAP #{nick} ACK :#{caps.map { |cap| "-#{cap}" }.join(' ') }")
+          send_msg(":tkellem CAP #{nick} ACK :#{caps.map { |cap| "-#{cap}" }.join(' ') }")
         when 'END'
           # do nothing
         else
@@ -188,6 +224,46 @@ module BouncerConnection
         end
       elsif command == 'PASS' && @state == :auth
         @password = msg.args.first
+      elsif command == 'AUTHENTICATE' && @state == :auth && caps.include?('sasl')
+        if msg.args.first == '*'
+          @sasl = nil
+          return send_msg(":tkellem 906 :SASL authentication aborted")
+        end
+        if !@sasl
+          mechanism = msg.args.first
+          if !BouncerConnection.sasl_mechanisms[mechanism]
+            return send_msg(":tkellem 904 #{nick} :SASL mechanism not supported")
+          end
+          @sasl = BouncerConnection.sasl_mechanisms[mechanism].new
+          response = nil
+        else
+          @sasl_response += msg.args.last
+          return if msg.args.last.length == 400
+          response = Base64.decode64(@sasl_response)
+        end
+        challenge = @sasl.response(response)
+        if challenge
+          @sasl_response = ''
+          challenge = Base64.strict_encode64(challenge)
+          while challenge.length >= 400
+            send_msg("AUTHENTICATE #{challenge[0..400]}")
+            challenge.slice!(0...400)
+          end
+          challenge = '+' if challenge.empty?
+          send_msg("AUTHENTICATE #{challenge}")
+        else
+          @username, @conn_name, @device_name = BouncerConnection.parse_username(@sasl.authcid) if @sasl.authcid
+          if @sasl.authcid && @user = User.where(username: @username).first
+            send_msg(":tkellem 900 #{nick} :You are now logged in")
+            send_msg(":tkellem 903 #{nick} :SASL authentication successful")
+            maybe_connect
+          else
+            send_msg(":tkellem 904 #{nick} :SASL authentication failed")
+          end
+          @sasl = nil
+        end
+      elsif command == 'AUTHENTICATE' && @state != :auth && caps.include?('sasl')
+        send_msg(":tkellem 907 :Already authenticated")
       elsif command == 'NICK' && @state == :auth
         @connecting_nick = msg.args.first
         maybe_connect
@@ -195,14 +271,14 @@ module BouncerConnection
         close_connection
       elsif command == 'USER' && @state == :auth
         unless @username
-          @username, @conn_info = msg.args.first.strip.split('@', 2).map { |a| a.downcase }
+          @username, @conn_name, @device_name = BouncerConnection.parse_username(msg.args.first)
         end
         maybe_connect
       elsif command == 'STARTTLS' && !@ssl
         send_msg("670 :STARTTLS successful, go ahead with TLS handshake")
         start_tls
       elsif command == 'PING' && @state == :auth
-        send_msg("PONG #{args.first}")
+        send_msg("PONG #{msg.args.first}")
       elsif @state == :auth
         error!("Protocol error. You must authenticate first.")
       elsif @state == :connected
@@ -213,20 +289,21 @@ module BouncerConnection
     end
   end
 
+  def self.parse_username(username)
+    username, conn_info = username.downcase.split('@', 2)
+    conn_name, device_name = conn_info.split(':', 2) if conn_info
+    device_name ||= 'default'
+    [username, conn_name, device_name]
+  end
+
   def maybe_connect
-    return unless @connecting_nick && @username && !@user
-    if @password
-      @name = @username
-      @user = User.authenticate(@username, @password)
+    return unless @connecting_nick && @username
+    if @password || @user
+      @user ||= User.authenticate(@username, @password)
       return error!("Unknown username: #{@username} or bad password.") unless @user
 
-      if @conn_info && !@conn_info.empty?
-        @conn_name, @device_name = @conn_info.split(':', 2)
-        # 'default' or missing device_name to use the default backlog
-        # pass a device_name to have device-independent backlogs
-        @device_name = @device_name.presence || 'default'
-        @name = "#{@username}-#{@conn_name}"
-        @name += "-#{@device_name}" if @device_name
+      if @conn_name
+        @name = "#{@username}-#{@conn_name}-#{device_name}"
         connect_to_irc_server
       else
         @name = "#{@username}-console"
@@ -235,7 +312,9 @@ module BouncerConnection
     else
       user = User.where(username: @username).first
       if user || user_registration == 'closed'
-        error!("No password given. Make sure to set your password in your IRC client config, and connect again.")
+        # wait longer for a SASL password
+        return if caps.include?('sasl')
+        #error!("No password given. Make sure to set your password in your IRC client config, and connect again.")
         if user_registration != 'closed'
           error!("If you are trying to register for a new account, this username is already taken. Please select another.")
         end
