@@ -14,10 +14,9 @@ tkellem supports multiple users, multiple device-independent backlogs
 per-user, and connecting to multiple IRC servers all from the same
 process.
 
-## IMPORTANT
+## Project Status
 
-Tkellem is beta quality software. Expect bugs and missing
-functionality.
+I am no longer actively developing Tkellem, since I'm no longer on IRC day-to-day. My company switched to another chat protocol. Maintainers are welcome.
 
 ## Getting Started
 
